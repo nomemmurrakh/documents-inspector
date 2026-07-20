@@ -10,9 +10,12 @@ Ordered, independently testable units. Build top to bottom; each task should com
 
 Legend: `[x]` done · `[~]` partially done · `[ ]` not started.
 
+**Committed:** Phase 0 (scaffold) and Phase 1 (reader core) — including this doc set — landed in
+`f5122a3` ("Add MMKV reader core and full documentation set"). Phases 2–4 are not started.
+
 ---
 
-## Phase 0 — Scaffold
+## Phase 0 — Scaffold  *(done — committed in `f5122a3`)*
 
 - [x] **T0.1** Empty plugin skeleton: IntelliJ Platform Gradle Plugin 2.10.0,
       `androidStudio("2025.1.1.14")`, bundled `org.jetbrains.android`, Kotlin 2.4.0, JDK 21,
@@ -23,7 +26,7 @@ Legend: `[x]` done · `[~]` partially done · `[ ]` not started.
 - [x] **T0.4** `kotlinx-serialization-cbor` dependency + `kotlin("plugin.serialization")` (tests use
       `@Serializable` fixtures).
 
-## Phase 1 — Reader core (pure Kotlin/JVM, platform-agnostic)
+## Phase 1 — Reader core (pure Kotlin/JVM, platform-agnostic)  *(done — committed in `f5122a3`)*
 
 - [x] **T1.1** `MmkvCrcHeader` — parse the `.crc` metafile (`crc32`, `iv`, `real_size`). Port of the
       crate's `cipher.rs`. Tests. See [ADR-0005](adr/0005-body-size-from-crc.md).
