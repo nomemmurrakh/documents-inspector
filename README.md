@@ -12,12 +12,20 @@ Early scaffold. Not yet functional — this repo currently contains only the plu
 ## How it will work
 
 Each Documents *collection* is one MMKV file (filename == collection name; the default collection
-is `documents.default`). The plugin pulls those files off a running, debuggable app over ADB
-(`adb exec-out run-as <pkg> …`), reads their `{document}::{field}` keys, and CBOR-decodes each
-field value for display. No native code, no device rooting for debuggable apps.
+is `documents.default`). The plugin acquires those files from a running, debuggable app, reads
+their `{document}::{field}` keys, and CBOR-decodes each field value for display. No native code.
+
+Documents is Kotlin Multiplatform, so the inspector targets both platforms through a shared reader
+behind per-platform acquisition backends:
+
+- **Android** device / emulator — `adb exec-out run-as <pkg> …`
+- **iOS Simulator** — `xcrun simctl` (the simulator sandbox is a directory on the Mac)
+- **iOS physical device** — `xcrun devicectl` (deferred to a later phase)
 
 Encrypted fields (written via a `FieldDecorator`) render as opaque blobs — the inspector is a
 plaintext tool.
+
+See [`docs/design.md`](docs/design.md) for the full design, platform matrix, and open risks.
 
 ## Build
 
