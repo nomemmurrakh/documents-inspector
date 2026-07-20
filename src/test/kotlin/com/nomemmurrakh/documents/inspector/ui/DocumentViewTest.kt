@@ -121,4 +121,11 @@ class DocumentViewTest {
     fun `empty plain document is labeled`() {
         assertEquals("(no fields)", DocumentView.render(doc(), ViewMode.PLAIN))
     }
+
+    @Test
+    fun `hasMaskedField detects opaque or bytes fields`() {
+        assertTrue(DocumentView.hasMaskedField(doc(Field("t", DocumentValue.Opaque(ByteArray(4))))))
+        assertTrue(DocumentView.hasMaskedField(doc(Field("b", DocumentValue.Bytes(ByteArray(4))))))
+        assertTrue(!DocumentView.hasMaskedField(doc(Field("n", DocumentValue.Text("x")))))
+    }
 }

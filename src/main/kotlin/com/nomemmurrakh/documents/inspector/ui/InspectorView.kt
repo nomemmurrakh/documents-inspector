@@ -30,16 +30,27 @@ import javax.swing.JPanel
  */
 internal class InspectorView(private val project: Project) {
 
-    private val panel = InspectorPanel()
+    private val panel = InspectorPanel(project)
     private val toolbar = createToolbar()
+    private val statusLabel = com.intellij.ui.components.JBLabel(" ").apply {
+        border = com.intellij.util.ui.JBUI.Borders.empty(0, 8)
+        foreground = com.intellij.util.ui.JBUI.CurrentTheme.ContextHelp.FOREGROUND
+    }
 
     val component: JComponent = JPanel(BorderLayout()).apply {
-        add(toolbar, BorderLayout.NORTH)
+        add(
+            JPanel(BorderLayout()).apply {
+                add(toolbar, BorderLayout.WEST)
+                add(statusLabel, BorderLayout.CENTER)
+            },
+            BorderLayout.NORTH,
+        )
         add(panel, BorderLayout.CENTER)
     }
 
     private var lastPackage: String? = null
     private var lastSerial: String? = null
+    private var lastDeviceName: String? = null
 
     private fun createToolbar(): JComponent {
         val group = DefaultActionGroup().apply {
@@ -90,6 +101,7 @@ internal class InspectorView(private val project: Project) {
                 null,
             )?.trim()
             if (pkg.isNullOrEmpty()) return@chooseDevice
+            lastDeviceName = device.displayName
             loadInBackground(pkg, device.serial)
         }
     }
@@ -136,9 +148,16 @@ internal class InspectorView(private val project: Project) {
     }
 
     private fun render(result: LoadResult) = ApplicationManager.getApplication().invokeLater {
+        statusLabel.text = statusText()
         when (result) {
             is LoadResult.Loaded -> panel.show(result.collections)
             is LoadResult.Failed -> panel.showMessage(result.message)
         }
+    }
+
+    private fun statusText(): String {
+        val pkg = lastPackage ?: return " "
+        val device = lastDeviceName
+        return if (device != null) "$pkg  •  $device" else pkg
     }
 }

@@ -89,6 +89,13 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
       messages, which `InspectorView` shows via `InspectorPanel.showMessage`; empty pull → "No
       collections found"; initial "connect a debuggable app". Missing-`.crc` surfaces as a read
       failure. (Verified via the pure `InspectorController` tests; the dialogs themselves are thin.)
+- [x] **T3.5** UI polish. Syntax-highlighted JSON via a real IntelliJ editor (`ContentEditor` —
+      resolves the JSON file type by extension, no hard JSON-plugin dependency; plain-text view
+      falls back to no highlighting). Per-row icons (collection / document, shield when a document
+      has a masked field). `JBPanelWithEmptyText` + list `emptyText` for empty/error states.
+      Uniform fixed-height pane headers so the three panes align; the content header shows the
+      selected document's key with the view-mode dropdown right-aligned; the connected
+      `package • device` shows beside the toolbar actions. Verified live.
 
 ## Phase 4 — Packaging
 

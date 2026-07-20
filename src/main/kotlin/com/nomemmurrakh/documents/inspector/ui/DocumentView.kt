@@ -29,6 +29,10 @@ internal object DocumentView {
         ViewMode.PLAIN -> plain(document)
     }
 
+    /** Whether any field in [document] is masked (an `Opaque`/`Bytes` value), so the UI can badge it. */
+    fun hasMaskedField(document: Document): Boolean =
+        document.fields.any { it.value is DocumentValue.Opaque || it.value is DocumentValue.Bytes }
+
     private fun json(document: Document): String {
         if (document.fields.isEmpty()) return "{}"
         val body = document.fields.joinToString(",\n") { field ->
