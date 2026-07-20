@@ -8,6 +8,14 @@ them as a browsable tree of **collections → documents → typed fields**.
 This is a companion tool, not part of the library. It reads the library's on-disk format; it does
 not depend on the library at runtime.
 
+## The docs
+
+- [`PRD.md`](PRD.md) — why the inspector exists, goals, and **non-goals**.
+- [`design.md`](design.md) — this file: how the pieces fit (architecture, platform matrix).
+- [`format.md`](format.md) — the authoritative on-disk byte format the reader parses.
+- [`tasks.md`](tasks.md) — the ordered build plan and what is done.
+- [`adr/`](adr/) — why specific decisions were made.
+
 ## Why this is feasible
 
 The Documents on-disk format is almost entirely self-describing, which is what makes an inspector
@@ -123,38 +131,80 @@ only Android/iOS/macOS and wraps the native library. Either route means shipping
 per-OS native binary inside the IntelliJ sandbox plus hand-written JNI — heavy and fragile for what
 is a small parser.
 
-**Chosen — a minimal pure-Kotlin reader, ported from prior art.** The read path is small and has
-been independently reimplemented without the native library (see below). Pure Kotlin keeps the
-plugin a single dependency-free jar that runs wherever the IDE runs.
+**Chosen — a minimal pure-Kotlin reader.** The read path is small and has been independently
+reimplemented without the native library by others (see Attribution). Pure Kotlin keeps the plugin a
+single dependency-free jar that runs wherever the IDE runs.
 
 ### Attribution
 
-The reader is a Kotlin **port** of the format work in
-[`syail/mmkv-parser`](https://github.com/syail/mmkv-parser) (a read-only Rust parser of the Tencent
-MMKV format, ~287 lines), cross-checked against the Tencent
-[MMKV design wiki](https://github.com/Tencent/mmkv/wiki/design_eng). We reuse the *format knowledge*,
-not its binary; the Rust parser is also used as a reference oracle in tests (its decoded output of a
-real file is diffed against ours). Credit must appear in `README.md` and this doc; carry the
+The reader reuses the *format knowledge* of the Rust crate
+[`mmkv-parser` 0.1.2](https://crates.io/crates/mmkv-parser) (an independent, more complete
+implementation of the Tencent MMKV format, with CRC and AES-CFB support), cross-checked against the
+Tencent [MMKV design wiki](https://github.com/Tencent/mmkv/wiki/design_eng). That crate is also used
+as the reference oracle in development: its decoded output of a real device file is diffed against
+ours. We reuse knowledge, not binaries. The earlier TypeScript parser
+[`syail/mmkv-parser`](https://github.com/syail/mmkv-parser) was consulted first but is incomplete
+(its own README notes no CRC/encryption support) and its documented header layout does not match the
+files this library writes — see below. Credit must appear in `README.md` and this doc; carry the
 attribution forward in any future rewrite.
 
 ### On-disk format
 
+The byte-level spec — main file, `.crc` metafile, the MMKV length prefix around each value, and the
+CBOR mapping — is the authoritative reference in [`format.md`](format.md), with the decisions behind
+it recorded as ADRs ([0005](adr/0005-body-size-from-crc.md) size-from-`.crc`,
+[0006](adr/0006-mmkv-length-prefix-then-cbor.md) length-prefix-then-CBOR). The summary that follows
+is kept here for context; `format.md` governs if the two ever drift.
+
+Verified 2026-07-20 against real files pulled from a device (`documents.default` and a named
+`session` collection) and cross-checked with the Rust oracle.
+
 Main file (`<collectionName>`):
 
-| field | offset | size |
-| --- | --- | --- |
-| `dataLength` (int32) | 0 | 4 |
-| varint region | 4 | n |
-| body | 4 + n | until `dataLength` consumed |
+| field | offset | size | notes |
+| --- | --- | --- | --- |
+| size field (int32 LE) | 0 | 4 | **not reliably the body size — see below** |
+| leading varint | 4 | 1+ | skipped |
+| body | after the varint | `realSize` bytes | append-only entries |
 
-- The file is mmap'd and padded to a memory page; bytes past `dataLength` are zero padding and are
-  ignored. `dataLength` is authoritative.
+- **The body size comes from the sibling `.crc` metafile, not the int32 at offset 0.** On the real
+  device files that int32 was `0`, while the true size lived in the `.crc` file at offset `0x1C`
+  (`realSize`: 334 for `documents.default`, 175 for `session`). A reader that trusts offset 0 reads
+  nothing — confirmed: the Rust oracle, the TypeScript parser, and a first Kotlin draft all failed
+  identically until fed the `.crc` size.
+- The `.crc` metafile layout (from the Rust crate's `MmkvCrcHeader`): `crc32` at 0, the AES-128-CFB
+  **IV** at `0x0C..0x1C`, and `realSize` (int32 LE) at `0x1C`.
+- The file is mmap'd and padded to a memory page; bytes past the body are zero padding and ignored.
 - Body is a sequence of append-only entries:
   `keyLen (varint) · key (UTF-8) · valueLen (varint) · value`.
 - **Latest-value-wins:** the same key may appear many times; scan the whole body and keep the last
-  occurrence. An **empty value marks a deletion**.
-- A sibling `<collectionName>.mmkv.crc` metafile holds the CRC32 and the AES **IV**. Not needed for
-  plaintext reads; its presence with MMKV-level encryption is detected and reported, not decoded.
+  occurrence. An **empty value marks a deletion**. (Confirmed on real data:
+  `active-download::bytesDownloaded` appeared six times; the last write wins.)
+- **Open question:** why offset 0 was `0` on these files is unresolved — the Rust crate's `decrypt`
+  path asserts offset 0 equals the `.crc` `realSize`, implying MMKV normally keeps them in sync.
+  Possible causes: the app had not flushed the mmap when the file was pulled, or the library writes
+  the size only to the `.crc`. The reader treats the `.crc` `realSize` as authoritative regardless.
+
+### Each value is MMKV-length-prefixed, then CBOR
+
+The `value` of an entry is **not** the Documents CBOR directly. The library stores each field via
+`MMKV.encode(key, byte[])`, and MMKV writes a `byte[]` in protobuf length-delimited form — a varint
+length followed by that many bytes. So the on-disk value is:
+
+```
+value = innerLen (varint) · cborBytes
+```
+
+The reader strips that inner length prefix before CBOR-decoding. On the real files, `totalBytes`
+(Long 2,000,000) is stored as `05 · 1a001e8480`, `isComplete` (false) as `01 · f4`, and `theme`
+(enum `LIGHT`) as `06 · 65"LIGHT"` — the leading byte is MMKV's length (5, 1, 6), and the remainder
+is exactly the standalone kotlinx-serialization-cbor encoding.
+
+This was traced end to end through the shipped `0.1.0` bytecode: `DocumentEncoder` →
+`cbor.encodeToByteArray` (plain CBOR, no prefix) → `applyWrap` (identity when no decorators) →
+`MmkvStorage.putBytes` → `MMKV.encode(key, byte[])`, where MMKV adds the length prefix. The Rust
+oracle does **not** strip this (it returns MMKV's raw stored value); unwrapping the `byte[]`
+container is one layer above what the oracle parses.
 
 ### Effort
 

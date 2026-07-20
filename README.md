@@ -6,8 +6,10 @@ library, rendering them as a browsable tree of **collections → documents → t
 
 ## Status
 
-Early scaffold. Not yet functional — this repo currently contains only the plugin skeleton
-(a bottom tool window placeholder) and its build setup.
+In progress. The **reader core is done and verified** — it parses real MMKV files pulled from a
+device and decodes their fields (31 tests pass, cross-checked against a Rust reference parser). What
+remains is the device-acquisition backends and the tree UI; the tool window is still a placeholder.
+See [`docs/tasks.md`](docs/tasks.md) for the build plan and progress.
 
 ## How it will work
 
@@ -25,7 +27,13 @@ behind per-platform acquisition backends:
 Encrypted fields (written via a `FieldDecorator`) render as opaque blobs — the inspector is a
 plaintext tool.
 
-See [`docs/design.md`](docs/design.md) for the full design, platform matrix, and open risks.
+## Documentation
+
+- [`docs/PRD.md`](docs/PRD.md) — why it exists, goals, and non-goals.
+- [`docs/design.md`](docs/design.md) — full design, platform matrix, limitations.
+- [`docs/format.md`](docs/format.md) — the authoritative on-disk byte format.
+- [`docs/tasks.md`](docs/tasks.md) — ordered build plan and progress.
+- [`docs/adr/`](docs/adr/) — the decisions behind the design.
 
 ## Build
 
@@ -38,11 +46,14 @@ Requires JDK 21.
 
 ## Credits
 
-The plugin reads MMKV files with a small pure-Kotlin reader **ported from**
-[`syail/mmkv-parser`](https://github.com/syail/mmkv-parser) — a read-only Rust parser of the Tencent
-MMKV on-disk format — cross-checked against the
-[MMKV design documentation](https://github.com/Tencent/mmkv/wiki/design_eng). We reuse the format
-knowledge, not the binary. Thanks to its author for reverse-engineering and documenting the format.
+The plugin reads MMKV files with a small pure-Kotlin reader whose format knowledge comes from the
+Rust crate [`mmkv-parser`](https://crates.io/crates/mmkv-parser) — an independent implementation of
+the Tencent MMKV on-disk format (with CRC and AES-CFB support) that also serves as the reference
+oracle in development — cross-checked against the
+[MMKV design documentation](https://github.com/Tencent/mmkv/wiki/design_eng). The TypeScript parser
+[`syail/mmkv-parser`](https://github.com/syail/mmkv-parser) was consulted earlier but is incomplete.
+We reuse the format knowledge, not the binary. Thanks to their authors for reverse-engineering and
+documenting the format.
 
 [MMKV](https://github.com/Tencent/MMKV) is a project of Tencent.
 
