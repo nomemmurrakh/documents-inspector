@@ -59,8 +59,9 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
       not-debuggable / unknown-package / multiple-devices / no-devices failures to clear messages.
       `adb` is behind an injectable `Adb` seam (`ProcessAdb` real, fake in tests), so the 12
       `AndroidAdbSourceTest` cases verify command construction + parsing with no live device.
-- [ ] **T2.3** Device/package selection plumbing (which `adb` device, which app package) — the
-      source already accepts a serial + package; this is the UI/action that chooses them.
+- [x] **T2.3** Device/package selection plumbing. `AdbDevices.list/parse` enumerates ready devices
+      from `adb devices -l` (skips offline/unauthorized; model → display name); the Connect action
+      auto-picks a single device or shows a chooser, then prompts for the app package. 7 tests.
 - [ ] **T2.4** `IosSimulatorSource` — resolve the sandbox via
       `xcrun simctl get_app_container <udid> <bundleId> data`, then plain file reads of
       `Documents/mmkv/`. Tests around path resolution.
@@ -69,12 +70,21 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
 
 ## Phase 3 — Plugin shell (UI)
 
-- [ ] **T3.1** Tree model over `Collection → Document → Field`, with the `DocumentValue` rendered
-      per node (opaque blobs labeled).
-- [ ] **T3.2** Replace the tool-window placeholder with the tree; wire a "refresh / pick source"
-      action to a `DeviceSource`.
-- [ ] **T3.3** Detail / value panel for a selected field (full value, byte view for `Opaque`).
-- [ ] **T3.4** Error + empty states (no device, app not debuggable, no collections, missing `.crc`).
+- [x] **T3.1** Tree model over `Collection → Document → Field`, with each `DocumentValue` rendered
+      per node — scalars inline, containers summarized and expanded, `Opaque`/`Bytes` as labeled
+      blobs. `DocumentValueRenderer` (pure) + `InspectorTreeModel` (Swing nodes); 12 tests.
+- [x] **T3.2** `InspectorView` wraps the `InspectorPanel` tree with a toolbar (Connect / Refresh
+      actions). Connect resolves a device + package and runs `InspectorController.load` on a
+      background task; the result renders on the EDT. Refresh re-runs the last target.
+      `InspectorController` (pull → `CollectionReader.read` → `LoadResult`) is Swing-free and tested
+      (decodes the real fixtures end-to-end; failures → `Failed`). 4 controller tests.
+- [~] **T3.3** Detail / value panel for a selected field (full value, byte view for `Opaque`).
+      Not started — the tree shows summaries; a selection-driven detail pane is still to build.
+- [x] **T3.4** Error + empty states. `InspectorController` turns `DeviceSourceException` (no device,
+      not debuggable, unknown package, multiple devices) and decode errors into `LoadResult.Failed`
+      messages, which `InspectorView` shows via `InspectorPanel.showMessage`; empty pull → "No
+      collections found"; initial "connect a debuggable app". Missing-`.crc` surfaces as a read
+      failure. (Verified via the pure `InspectorController` tests; the dialogs themselves are thin.)
 
 ## Phase 4 — Packaging
 
