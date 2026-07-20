@@ -1,0 +1,21 @@
+<idea-plugin>
+    <id>com.nomemmurrakh.documents.inspector</id>
+    <name>Documents Inspector</name>
+    <vendor email="memonkhurram37@gmail.com" url="https://documents.nomemmurrakh.com">nomemmurrakh</vendor>
+
+    <description><![CDATA[
+        Inspect on-device MMKV files written by the
+        <a href="https://documents.nomemmurrakh.com">Documents</a> Kotlin Multiplatform library
+        as a browsable tree of collections, documents, and typed fields.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.android</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow
+            id="Documents Inspector"
+            anchor="bottom"
+            factoryClass="com.nomemmurrakh.documents.inspector.InspectorToolWindowFactory"/>
+    </extensions>
+</idea-plugin>
