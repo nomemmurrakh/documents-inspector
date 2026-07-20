@@ -14,10 +14,13 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.nomemmurrakh.documents.inspector.InspectorController
 import com.nomemmurrakh.documents.inspector.LoadResult
-import com.nomemmurrakh.documents.inspector.source.AdbDevice
 import com.nomemmurrakh.documents.inspector.source.AdbDevices
+import com.nomemmurrakh.documents.inspector.source.DeviceSource
 import com.nomemmurrakh.documents.inspector.source.DeviceSourceException
+import com.nomemmurrakh.documents.inspector.source.IosSimulator
+import com.nomemmurrakh.documents.inspector.source.IosSimulators
 import com.nomemmurrakh.documents.inspector.source.ProcessAdb
+import com.nomemmurrakh.documents.inspector.source.ProcessSimctl
 import java.awt.BorderLayout
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -48,9 +51,13 @@ internal class InspectorView(private val project: Project) {
         add(panel, BorderLayout.CENTER)
     }
 
-    private var lastPackage: String? = null
-    private var lastSerial: String? = null
-    private var lastDeviceName: String? = null
+    private var lastTarget: Target? = null
+
+    private class Target(
+        val appLabel: String,
+        val deviceName: String,
+        val sourceFactory: () -> DeviceSource,
+    )
 
     private fun createToolbar(): JComponent {
         val group = DefaultActionGroup().apply {
@@ -69,19 +76,27 @@ internal class InspectorView(private val project: Project) {
 
     private inner class RefreshAction : AnAction("Refresh", "Reload the current app", AllIcons.Actions.Refresh) {
         override fun actionPerformed(e: AnActionEvent) {
-            val pkg = lastPackage
-            if (pkg == null) connect() else loadInBackground(pkg, lastSerial)
+            val target = lastTarget
+            if (target == null) connect() else loadInBackground(target)
         }
 
         override fun update(e: AnActionEvent) {
-            e.presentation.isEnabled = lastPackage != null
+            e.presentation.isEnabled = lastTarget != null
         }
     }
 
     private fun connect() {
-        val adb = ProcessAdb()
+        choosePlatform { platform ->
+            when (platform) {
+                Platform.ANDROID -> connectAndroid()
+                Platform.IOS_SIMULATOR -> connectIosSimulator()
+            }
+        }
+    }
+
+    private fun connectAndroid() {
         val devices = try {
-            AdbDevices.list(adb)
+            AdbDevices.list(ProcessAdb())
         } catch (ex: DeviceSourceException) {
             panel.showMessage(ex.message ?: "Could not list devices.")
             return
@@ -90,61 +105,80 @@ internal class InspectorView(private val project: Project) {
             panel.showMessage("No device or emulator is attached. Start one and try again.")
             return
         }
-
-        chooseDevice(devices) { device ->
-            val pkg = Messages.showInputDialog(
-                project,
-                "Application id of the debuggable app to inspect:",
-                "Documents Inspector",
-                null,
-                lastPackage,
-                null,
-            )?.trim()
-            if (pkg.isNullOrEmpty()) return@chooseDevice
-            lastDeviceName = device.displayName
-            loadInBackground(pkg, device.serial)
+        chooseFrom(devices, "Select Device", { it.displayName }) { device ->
+            val pkg = promptForApp("Application id of the debuggable app to inspect:") ?: return@chooseFrom
+            loadInBackground(
+                Target(pkg, device.displayName) {
+                    InspectorController.androidSource(ProcessAdb(), pkg, device.serial)
+                },
+            )
         }
     }
 
-    private fun chooseDevice(devices: List<AdbDevice>, onChosen: (AdbDevice) -> Unit) {
-        if (devices.size == 1) {
-            onChosen(devices.single())
+    private fun connectIosSimulator() {
+        val simulators = try {
+            IosSimulators.listBooted(ProcessSimctl())
+        } catch (ex: DeviceSourceException) {
+            panel.showMessage(ex.message ?: "Could not list simulators.")
+            return
+        }
+        if (simulators.isEmpty()) {
+            panel.showMessage("No booted iOS simulator found. Boot one in Simulator and try again.")
+            return
+        }
+        chooseFrom(simulators, "Select Simulator", { it.displayName }) { sim ->
+            val bundleId = promptForApp("Bundle identifier of the app to inspect:") ?: return@chooseFrom
+            loadInBackground(
+                Target(bundleId, sim.displayName) {
+                    InspectorController.iosSimulatorSource(ProcessSimctl(), sim.udid, bundleId)
+                },
+            )
+        }
+    }
+
+    private fun promptForApp(prompt: String): String? =
+        Messages.showInputDialog(project, prompt, "Documents Inspector", null, lastTarget?.appLabel, null)?.trim()
+            ?.takeIf { it.isNotEmpty() }
+
+    private fun choosePlatform(onChosen: (Platform) -> Unit) =
+        chooseFrom(Platform.entries.toList(), "Select Platform", { it.label }, onChosen)
+
+    private fun <T> chooseFrom(items: List<T>, title: String, label: (T) -> String, onChosen: (T) -> Unit) {
+        if (items.size == 1) {
+            onChosen(items.single())
             return
         }
         JBPopupFactory.getInstance()
-            .createPopupChooserBuilder(devices)
-            .setTitle("Select Device")
+            .createPopupChooserBuilder(items)
+            .setTitle(title)
             .setItemChosenCallback(onChosen)
-            .setRenderer(object : com.intellij.ui.ColoredListCellRenderer<AdbDevice>() {
-                override fun customizeCellRenderer(
-                    list: javax.swing.JList<out AdbDevice>,
-                    value: AdbDevice,
-                    index: Int,
-                    selected: Boolean,
-                    hasFocus: Boolean,
-                ) {
-                    append(value.displayName)
+            .setRenderer(object : com.intellij.ui.ColoredListCellRenderer<T>() {
+                override fun customizeCellRenderer(list: javax.swing.JList<out T>, value: T, index: Int, selected: Boolean, hasFocus: Boolean) {
+                    append(label(value))
                 }
             })
             .createPopup()
             .showInFocusCenter()
     }
 
-    private fun loadInBackground(pkg: String, serial: String?) {
-        lastPackage = pkg
-        lastSerial = serial
-        panel.showMessage("Loading $pkg…")
+    private fun loadInBackground(target: Target) {
+        lastTarget = target
+        panel.showMessage("Loading ${target.appLabel}…")
 
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Reading Documents store", true) {
             private var result: LoadResult = LoadResult.Failed("Cancelled.")
 
             override fun run(indicator: ProgressIndicator) {
-                val source = InspectorController.androidSource(ProcessAdb(), pkg, serial)
-                result = InspectorController.load(source)
+                result = InspectorController.load(target.sourceFactory())
             }
 
             override fun onSuccess() = render(result)
         })
+    }
+
+    private enum class Platform(val label: String) {
+        ANDROID("Android device / emulator"),
+        IOS_SIMULATOR("iOS simulator"),
     }
 
     private fun render(result: LoadResult) = ApplicationManager.getApplication().invokeLater {
@@ -156,8 +190,7 @@ internal class InspectorView(private val project: Project) {
     }
 
     private fun statusText(): String {
-        val pkg = lastPackage ?: return " "
-        val device = lastDeviceName
-        return if (device != null) "$pkg  •  $device" else pkg
+        val target = lastTarget ?: return " "
+        return "${target.appLabel}  •  ${target.deviceName}"
     }
 }

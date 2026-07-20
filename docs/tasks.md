@@ -62,9 +62,15 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
 - [x] **T2.3** Device/package selection plumbing. `AdbDevices.list/parse` enumerates ready devices
       from `adb devices -l` (skips offline/unauthorized; model → display name); the Connect action
       auto-picks a single device or shows a chooser, then prompts for the app package. 7 tests.
-- [ ] **T2.4** `IosSimulatorSource` — resolve the sandbox via
-      `xcrun simctl get_app_container <udid> <bundleId> data`, then plain file reads of
-      `Documents/mmkv/`. Tests around path resolution.
+- [x] **T2.4** `IosSimulatorSource` — resolves the container via
+      `xcrun simctl get_app_container <udid> <bundleId> data`, then reads `Documents/mmkv/` off the
+      Mac filesystem (pairs each main file with its `.crc`). `Simctl` seam (interface + `ProcessSimctl`)
+      and a `CollectionFiles` seam (`LocalFiles` real) keep it testable without a simulator.
+      `IosSimulators.listBooted/parse` enumerates **booted** sims from `simctl list devices booted -j`
+      (kotlinx-serialization-json); the Connect action now asks Android vs iOS first. 12 tests
+      (`IosSimulatorsTest` 8, `IosSimulatorSourceTest` 4). Parser validated against real `simctl -j`
+      output. **Not yet exercised end-to-end live** (needs a booted sim with the Documents iOS sample
+      installed).
 - [ ] **T2.5** `IosDeviceSource` — `xcrun devicectl device copy from …`. **Deferred** (a clean
       additional backend, not a redesign).
 

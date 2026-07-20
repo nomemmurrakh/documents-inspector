@@ -4,8 +4,12 @@ import com.nomemmurrakh.documents.inspector.reader.Collection
 import com.nomemmurrakh.documents.inspector.reader.CollectionReader
 import com.nomemmurrakh.documents.inspector.source.AndroidAdbSource
 import com.nomemmurrakh.documents.inspector.source.Adb
+import com.nomemmurrakh.documents.inspector.source.CollectionFiles
 import com.nomemmurrakh.documents.inspector.source.DeviceSource
 import com.nomemmurrakh.documents.inspector.source.DeviceSourceException
+import com.nomemmurrakh.documents.inspector.source.IosSimulatorSource
+import com.nomemmurrakh.documents.inspector.source.LocalFiles
+import com.nomemmurrakh.documents.inspector.source.Simctl
 
 /** The outcome of a load: decoded collections, or a message safe to show the user. */
 internal sealed interface LoadResult {
@@ -24,6 +28,15 @@ internal object InspectorController {
     /** Builds an Android source for [packageName] on [deviceSerial] (null = the only device). */
     fun androidSource(adb: Adb, packageName: String, deviceSerial: String?): DeviceSource =
         AndroidAdbSource(adb, packageName, deviceSerial)
+
+    /** Builds an iOS-simulator source for [bundleId] on simulator [udid]. */
+    fun iosSimulatorSource(
+        simctl: Simctl,
+        udid: String,
+        bundleId: String,
+        files: CollectionFiles = LocalFiles,
+    ): DeviceSource =
+        IosSimulatorSource(simctl, files, udid, bundleId)
 
     fun load(source: DeviceSource): LoadResult =
         try {
