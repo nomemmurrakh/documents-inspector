@@ -1,6 +1,6 @@
 # Documents Inspector — Task Breakdown (v1)
 
-**Last updated:** 2026-07-20
+**Last updated:** 2026-07-21
 
 Ordered, independently testable units. Build top to bottom; each task should compile and have tests
 (where it has logic) before moving on.
@@ -10,8 +10,25 @@ Ordered, independently testable units. Build top to bottom; each task should com
 
 Legend: `[x]` done · `[~]` partially done · `[ ]` not started.
 
-**Committed:** Phase 0 (scaffold) and Phase 1 (reader core) — including this doc set — landed in
-`f5122a3` ("Add MMKV reader core and full documentation set"). Phases 2–4 are not started.
+## Current state (0.1.0 — feature-complete)
+
+Phases 0–4 are done. The plugin has been **verified live on Android (real device) and the iOS
+simulator** against the Documents sample app (`com.nomemmurrakh.documents.sample`). 76 tests pass;
+`buildPlugin` produces `documents-inspector-0.1.0.zip`; `verifyPlugin` → Compatible.
+
+**What remains (all optional / deferred):**
+- **T2.5** — `IosDeviceSource` (physical iOS via `xcrun devicectl`).
+- **JetBrains Marketplace** publishing (`signPlugin`/`publishPlugin`, screenshots, account/review).
+- Optional: render a CBOR array of all-small-ints (e.g. `session_key`'s AES bytes) compactly rather
+  than as a long number list.
+
+**To resume a live test:** boot the iPhone 17 Pro sim, ensure the sample app is installed (it builds
+after the MMKV SPM 2.4.0 pin — commit `f085105` in the documents repo), then `./gradlew runIde`,
+open any project, **Documents Inspector** tool window → Connect → iOS simulator → bundle
+`com.nomemmurrakh.documents.sample`. `runIde` bakes the plugin at launch, so restart it to pick up
+code changes.
+
+**Unpushed:** the inspector repo is ahead of `origin/master` (ask before pushing, per the rule).
 
 ---
 
