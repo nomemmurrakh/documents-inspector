@@ -4,10 +4,34 @@
     <vendor email="memonkhurram37@gmail.com" url="https://documents.nomemmurrakh.com">nomemmurrakh</vendor>
 
     <description><![CDATA[
-        Inspect on-device MMKV files written by the
-        <a href="https://documents.nomemmurrakh.com">Documents</a> Kotlin Multiplatform library
-        as a browsable tree of collections, documents, and typed fields.
+        <p>Inspect on-device <a href="https://github.com/Tencent/MMKV">MMKV</a> files written by the
+        <a href="https://documents.nomemmurrakh.com">Documents</a> Kotlin Multiplatform library,
+        presented as a browsable tree of <b>collections &rarr; documents &rarr; typed fields</b>.</p>
+
+        <p>Pull a debuggable app's store straight off a device and read what it actually persisted:</p>
+        <ul>
+            <li><b>Android</b> device or emulator via <code>adb run-as</code>.</li>
+            <li><b>iOS simulator</b> via <code>xcrun simctl</code>.</li>
+            <li>A three-pane view: collections, then documents, then the selected document as
+                <b>syntax-highlighted JSON</b> or plain text.</li>
+            <li>Values decode from CBOR without the original data class; fields written through a
+                <code>FieldDecorator</code> (encryption) show as masked, by design.</li>
+        </ul>
+
+        <p>Read-only and non-destructive. No runtime dependency on the Documents library &mdash; the
+        plugin reads the on-disk format directly with a small pure-Kotlin reader.</p>
     ]]></description>
+
+    <change-notes><![CDATA[
+        <h4>0.1.0</h4>
+        <ul>
+            <li>Initial release.</li>
+            <li>Read Documents MMKV stores as a collections &rarr; documents &rarr; fields tree.</li>
+            <li>Acquisition from Android devices/emulators (<code>adb</code>) and iOS simulators
+                (<code>simctl</code>).</li>
+            <li>JSON and plain-text views; encrypted (decorated) fields shown masked.</li>
+        </ul>
+    ]]></change-notes>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.android</depends>

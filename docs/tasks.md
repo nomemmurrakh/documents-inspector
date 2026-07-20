@@ -105,8 +105,16 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
 
 ## Phase 4 — Packaging
 
-- [ ] **T4.1** Plugin metadata, description, icon; `verifyPlugin` clean.
-- [ ] **T4.2** Decide distribution (JetBrains Marketplace vs. side-load) and document install steps.
+- [x] **T4.1** Plugin metadata, description, icon. `pluginIcon.svg` (Kotlin-gradient document mark),
+      a rich HTML `<description>` + `<change-notes>` in `plugin.xml`, version `0.1.0` (dropped
+      `-SNAPSHOT`). `verifyPluginStructure` + `verifyPluginProjectConfiguration` pass; `buildPlugin`
+      produces `documents-inspector-0.1.0.zip` with the icon + descriptor packaged. **`verifyPlugin`
+      → Compatible** against Android Studio `AI-251...` (a `pluginVerification.ides` block was added);
+      the only advisories are default `ToolWindowFactory` interface methods (inherited, not our code).
+- [x] **T4.2** Distribution: **side-load** for now (no Marketplace yet). README documents building
+      the zip and "Install Plugin from Disk", plus a Usage section (connect → platform → target →
+      app id, browse JSON/plain). Marketplace publishing (`signPlugin`/`publishPlugin`, screenshots,
+      review) is left for when there's an account.
 
 ---
 

@@ -6,12 +6,12 @@ library, rendering them as a browsable tree of **collections → documents → t
 
 ## Status
 
-In progress. The **reader core is done and verified** — it parses real MMKV files pulled from a
-device and decodes their fields (31 tests pass, cross-checked against a Rust reference parser). What
-remains is the device-acquisition backends and the tree UI; the tool window is still a placeholder.
-See [`docs/tasks.md`](docs/tasks.md) for the build plan and progress.
+Working on **Android and iOS simulator**, verified live against the Documents sample app. Reads a
+store as a three-pane tree (collections → documents → fields), rendering each document as
+syntax-highlighted JSON or plain text. Physical-iOS acquisition and Marketplace publishing are the
+remaining items — see [`docs/tasks.md`](docs/tasks.md).
 
-## How it will work
+## How it works
 
 Each Documents *collection* is one MMKV file (filename == collection name; the default collection
 is `documents.default`). The plugin acquires those files from a running, debuggable app, reads
@@ -35,12 +35,35 @@ plaintext tool.
 - [`docs/tasks.md`](docs/tasks.md) — ordered build plan and progress.
 - [`docs/adr/`](docs/adr/) — the decisions behind the design.
 
+## Install (side-load)
+
+The plugin is not yet on the JetBrains Marketplace; install the built zip from disk.
+
+1. Build the artifact: `./gradlew buildPlugin` → `build/distributions/documents-inspector-<version>.zip`.
+2. In IntelliJ IDEA or Android Studio: **Settings → Plugins → ⚙ → Install Plugin from Disk…**,
+   choose that zip, and restart.
+3. The **Documents Inspector** tool window appears at the bottom of the IDE.
+
+## Usage
+
+1. Run a **debuggable** (Android) or **development-signed** (iOS) build of your app on a device,
+   emulator, or booted simulator.
+2. Open the **Documents Inspector** tool window and click **Connect**.
+3. Choose the platform (Android device / iOS simulator), pick the target, and enter the app's
+   application id (Android) or bundle id (iOS).
+4. Browse: pick a collection, then a document, and read its fields as JSON or plain text. Encrypted
+   (`FieldDecorator`) fields show masked. **Refresh** reloads the last target.
+
+Reading app-private storage requires a debuggable / development-signed build — this is inherent to
+the platforms, not a plugin limitation.
+
 ## Build
 
 Requires JDK 21.
 
 ```bash
-./gradlew build          # compile + verify plugin
+./gradlew build          # compile + run tests
+./gradlew buildPlugin    # build the installable plugin zip
 ./gradlew runIde         # launch a sandbox IDE with the plugin loaded
 ```
 

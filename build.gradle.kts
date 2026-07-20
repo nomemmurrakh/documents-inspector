@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.nomemmurrakh"
-version = "0.1.0-SNAPSHOT"
+version = "0.1.0"
 
 repositories {
     mavenCentral()
@@ -37,6 +37,11 @@ intellijPlatform {
         ideaVersion {
             sinceBuild = "251"
             untilBuild = provider { null }
+        }
+    }
+    pluginVerification {
+        ides {
+            ide(IntelliJPlatformType.AndroidStudio, "2025.1.1.14")
         }
     }
 }
