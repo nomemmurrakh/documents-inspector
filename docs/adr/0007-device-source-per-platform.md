@@ -21,7 +21,7 @@ Acquisition mechanisms per backend:
 
 | Backend | Mechanism | MMKV dir on target |
 | --- | --- | --- |
-| `AndroidAdbSource` | `adb exec-out run-as <pkg> cat files/mmkv/<file>` | `/data/data/<pkg>/files/mmkv/` |
+| `AndroidAdbSource` | `adb [-s <serial>] exec-out run-as <pkg> cat files/mmkv/<file>` | `/data/data/<pkg>/files/mmkv/` |
 | `IosSimulatorSource` | `xcrun simctl get_app_container <udid> <bundleId> data` → file reads | `<sandbox>/Documents/mmkv/` |
 | `IosDeviceSource` (later) | `xcrun devicectl device copy from …` | app container `Documents/mmkv/` |
 
@@ -34,6 +34,9 @@ Acquisition mechanisms per backend:
   sandbox path is resolved it is plain file I/O — the same code path as Android once bytes are local.
 - Each backend must pull *both* `<name>` and `<name>.crc` (the size lives in the `.crc`, per
   [ADR-0005](0005-body-size-from-crc.md)) — a single obligation stated in one interface.
+- Multiple attached Android targets are disambiguated with `adb -s <serial>` (a stable device
+  serial from `adb devices`), not `-t <transport-id>` — transport ids are transient and change
+  across reconnects, so a serial is the durable way to pin a target.
 
 **Negative / cost**
 - Every backend depends on external tooling (`adb`, `xcrun`) being installed and on the target being

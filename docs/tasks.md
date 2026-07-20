@@ -52,12 +52,15 @@ Legend: `[x]` done · `[~]` partially done · `[ ]` not started.
 See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull **both** `<name>` and
 `<name>.crc`.
 
-- [ ] **T2.1** `DeviceSource` interface — "give me a local copy of this app's mmkv files" — plus a
-      small model of a pulled collection (name + main bytes + crc bytes).
-- [ ] **T2.2** `AndroidAdbSource` — enumerate + pull via `adb exec-out run-as <pkg> …`; handle the
-      multi-transport (`-t`) case; surface "app not debuggable" clearly. Tests around command
-      construction / parsing (not a live device).
-- [ ] **T2.3** Device/package selection plumbing (which `adb` device, which app package).
+- [x] **T2.1** `DeviceSource` interface — "give me a local copy of this app's mmkv files" — plus
+      `PulledCollection` (name + main bytes + crc bytes) and `DeviceSourceException`.
+- [x] **T2.2** `AndroidAdbSource` — enumerate `files/mmkv/` and pull each main + `.crc` via
+      `adb exec-out run-as <pkg> …`; pin the target with `-s <serial>` when given; map
+      not-debuggable / unknown-package / multiple-devices / no-devices failures to clear messages.
+      `adb` is behind an injectable `Adb` seam (`ProcessAdb` real, fake in tests), so the 12
+      `AndroidAdbSourceTest` cases verify command construction + parsing with no live device.
+- [ ] **T2.3** Device/package selection plumbing (which `adb` device, which app package) — the
+      source already accepts a serial + package; this is the UI/action that chooses them.
 - [ ] **T2.4** `IosSimulatorSource` — resolve the sandbox via
       `xcrun simctl get_app_container <udid> <bundleId> data`, then plain file reads of
       `Documents/mmkv/`. Tests around path resolution.
