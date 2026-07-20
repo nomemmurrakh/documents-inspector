@@ -78,8 +78,12 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
       background task; the result renders on the EDT. Refresh re-runs the last target.
       `InspectorController` (pull → `CollectionReader.read` → `LoadResult`) is Swing-free and tested
       (decodes the real fixtures end-to-end; failures → `Failed`). 4 controller tests.
-- [~] **T3.3** Detail / value panel for a selected field (full value, byte view for `Opaque`).
-      Not started — the tree shows summaries; a selection-driven detail pane is still to build.
+- [x] **T3.3** Three-pane master-detail (replaced the single tree): **Collections → Documents →
+      Document content**, side by side via nested `JBSplitter`s. The content pane has a view-mode
+      dropdown — **JSON** (pretty-printed; list→array, map→object) or **Plain text** (`field: value`
+      lines). `Opaque`/`Bytes` values (decorator-encrypted) render as length-hinted asterisk masks,
+      never raw bytes. `DocumentView` (pure JSON/plain renderer, 8 tests) + `InspectorPanel`
+      rewrite. The earlier `InspectorTreeModel`/`DocumentValueRenderer` were removed as superseded.
 - [x] **T3.4** Error + empty states. `InspectorController` turns `DeviceSourceException` (no device,
       not debuggable, unknown package, multiple devices) and decode errors into `LoadResult.Failed`
       messages, which `InspectorView` shows via `InspectorPanel.showMessage`; empty pull → "No
