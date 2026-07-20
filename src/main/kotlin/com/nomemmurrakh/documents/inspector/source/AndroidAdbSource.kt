@@ -35,11 +35,11 @@ internal class AndroidAdbSource(
     }
 
     private fun listMainFileNames(): List<String> {
-        val result = adb.run(target() + listOf("exec-out", "run-as", packageName, "ls", MMKV_DIR))
+        val result = adb.run(target() + listOf("exec-out", "run-as", packageName, "ls", "-1", MMKV_DIR))
         if (!result.isSuccess) throw failure("list $MMKV_DIR", result)
 
         val entries = String(result.stdout, Charsets.UTF_8)
-            .split('\n', '\r')
+            .split(Regex("\\s+"))
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .toSet()

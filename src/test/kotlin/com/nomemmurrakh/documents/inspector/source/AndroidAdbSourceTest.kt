@@ -55,9 +55,20 @@ class AndroidAdbSourceTest {
         AndroidAdbSource(adb, pkg).pull()
 
         assertEquals(
-            listOf("exec-out", "run-as", pkg, "ls", "files/mmkv"),
+            listOf("exec-out", "run-as", pkg, "ls", "-1", "files/mmkv"),
             adb.calls.single(),
         )
+    }
+
+    @Test
+    fun `parses a whitespace-separated ls listing`() {
+        val adb = FakeAdb { args ->
+            if (args.contains("ls")) ok("documents.default documents.default.crc session session.crc\n")
+            else ok(byteArrayOf(0))
+        }
+        val pulled = AndroidAdbSource(adb, pkg).pull()
+
+        assertEquals(listOf("documents.default", "session"), pulled.map { it.name })
     }
 
     @Test
