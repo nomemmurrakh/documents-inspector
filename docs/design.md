@@ -111,14 +111,59 @@ This is inherent to reading app-private files, not a limitation we can engineer 
   opaque without that key. Out of scope for v1.
 - **No type name.** Documents show field names and values, never the source data-class name.
 
-## Open technical risk (spike first)
+## MMKV reader (resolved)
 
-Reading the MMKV file format in a pure-JVM plugin (no Android runtime). Two candidate approaches:
+The plugin runs on a desktop JVM with no Android/iOS runtime, so once a collection file is on the
+local disk it must parse MMKV's on-disk bytes itself. Two approaches were considered and one is
+chosen.
 
-1. Bundle Tencent's MMKV JVM/desktop artifact and read files through it.
-2. Write a minimal reader for MMKV's append-only, mmap'd key/value layout.
+**Rejected — bundle a native MMKV.** Tencent MMKV has a POSIX/desktop C++ core, but publishes no
+standalone desktop-JVM/JNI binding; the Kotlin Multiplatform port (`ctripcorp/mmkv-kotlin`) targets
+only Android/iOS/macOS and wraps the native library. Either route means shipping and loading a
+per-OS native binary inside the IntelliJ sandbox plus hand-written JNI — heavy and fragile for what
+is a small parser.
 
-This is the one unresolved unknown and should be spiked before committing to full estimates.
+**Chosen — a minimal pure-Kotlin reader, ported from prior art.** The read path is small and has
+been independently reimplemented without the native library (see below). Pure Kotlin keeps the
+plugin a single dependency-free jar that runs wherever the IDE runs.
+
+### Attribution
+
+The reader is a Kotlin **port** of the format work in
+[`syail/mmkv-parser`](https://github.com/syail/mmkv-parser) (a read-only Rust parser of the Tencent
+MMKV format, ~287 lines), cross-checked against the Tencent
+[MMKV design wiki](https://github.com/Tencent/mmkv/wiki/design_eng). We reuse the *format knowledge*,
+not its binary; the Rust parser is also used as a reference oracle in tests (its decoded output of a
+real file is diffed against ours). Credit must appear in `README.md` and this doc; carry the
+attribution forward in any future rewrite.
+
+### On-disk format
+
+Main file (`<collectionName>`):
+
+| field | offset | size |
+| --- | --- | --- |
+| `dataLength` (int32) | 0 | 4 |
+| varint region | 4 | n |
+| body | 4 + n | until `dataLength` consumed |
+
+- The file is mmap'd and padded to a memory page; bytes past `dataLength` are zero padding and are
+  ignored. `dataLength` is authoritative.
+- Body is a sequence of append-only entries:
+  `keyLen (varint) · key (UTF-8) · valueLen (varint) · value`.
+- **Latest-value-wins:** the same key may appear many times; scan the whole body and keep the last
+  occurrence. An **empty value marks a deletion**.
+- A sibling `<collectionName>.mmkv.crc` metafile holds the CRC32 and the AES **IV**. Not needed for
+  plaintext reads; its presence with MMKV-level encryption is detected and reported, not decoded.
+
+### Effort
+
+Small — a varint decoder, the header + entry loop, and the latest-wins dedupe: on the order of
+150–300 lines of Kotlin, matching the Rust reference. No native dependencies; the previously-open
+technical risk is closed.
+
+Note this MMKV-level encryption is distinct from Documents' `FieldDecorator` encryption (per-value,
+at the CBOR layer) covered under Limitations — two independent layers.
 
 ## Build
 

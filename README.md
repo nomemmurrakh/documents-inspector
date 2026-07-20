@@ -36,6 +36,16 @@ Requires JDK 21.
 ./gradlew runIde         # launch a sandbox IDE with the plugin loaded
 ```
 
+## Credits
+
+The plugin reads MMKV files with a small pure-Kotlin reader **ported from**
+[`syail/mmkv-parser`](https://github.com/syail/mmkv-parser) — a read-only Rust parser of the Tencent
+MMKV on-disk format — cross-checked against the
+[MMKV design documentation](https://github.com/Tencent/mmkv/wiki/design_eng). We reuse the format
+knowledge, not the binary. Thanks to its author for reverse-engineering and documenting the format.
+
+[MMKV](https://github.com/Tencent/MMKV) is a project of Tencent.
+
 ## License
 
 TBD.
