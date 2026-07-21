@@ -7,9 +7,13 @@ import com.nomemmurrakh.documents.inspector.source.Adb
 import com.nomemmurrakh.documents.inspector.source.CollectionFiles
 import com.nomemmurrakh.documents.inspector.source.DeviceSource
 import com.nomemmurrakh.documents.inspector.source.DeviceSourceException
+import com.nomemmurrakh.documents.inspector.source.Devicectl
+import com.nomemmurrakh.documents.inspector.source.IosDeviceSource
 import com.nomemmurrakh.documents.inspector.source.IosSimulatorSource
 import com.nomemmurrakh.documents.inspector.source.LocalFiles
+import com.nomemmurrakh.documents.inspector.source.PullTarget
 import com.nomemmurrakh.documents.inspector.source.Simctl
+import com.nomemmurrakh.documents.inspector.source.TempPullTarget
 
 /** The outcome of a load: decoded collections, or a message safe to show the user. */
 internal sealed interface LoadResult {
@@ -37,6 +41,15 @@ internal object InspectorController {
         files: CollectionFiles = LocalFiles,
     ): DeviceSource =
         IosSimulatorSource(simctl, files, udid, bundleId)
+
+    /** Builds a physical-iOS source for [bundleId] on the device identified by [deviceId]. */
+    fun iosDeviceSource(
+        devicectl: Devicectl,
+        deviceId: String,
+        bundleId: String,
+        pullTarget: PullTarget = TempPullTarget,
+    ): DeviceSource =
+        IosDeviceSource(devicectl, pullTarget, deviceId, bundleId)
 
     fun load(source: DeviceSource): LoadResult =
         try {

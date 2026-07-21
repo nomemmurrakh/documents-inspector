@@ -12,6 +12,7 @@
         <ul>
             <li><b>Android</b> device or emulator via <code>adb run-as</code>.</li>
             <li><b>iOS simulator</b> via <code>xcrun simctl</code>.</li>
+            <li><b>iOS device</b> via <code>xcrun devicectl</code>.</li>
             <li>A three-pane view: collections, then documents, then the selected document as
                 <b>syntax-highlighted JSON</b> or plain text.</li>
             <li>Values decode from CBOR without the original data class; fields written through a
@@ -27,8 +28,9 @@
         <ul>
             <li>Initial release.</li>
             <li>Read Documents MMKV stores as a collections &rarr; documents &rarr; fields tree.</li>
-            <li>Acquisition from Android devices/emulators (<code>adb</code>) and iOS simulators
-                (<code>simctl</code>).</li>
+            <li>Acquisition from Android devices/emulators (<code>adb</code>), iOS simulators
+                (<code>simctl</code>), and physical iOS devices (<code>devicectl</code>).</li>
+            <li>The app id prompt is prefilled from the open project and stays editable.</li>
             <li>JSON and plain-text views; encrypted (decorated) fields shown masked.</li>
         </ul>
     ]]></change-notes>

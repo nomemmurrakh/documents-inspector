@@ -24,8 +24,11 @@ testing surfaced one ordering bug — with no `.xcodeproj` in the open project t
 simulator apps alone and preselected an unrelated app that sorted first; fixed in T5.6 by ranking
 apps that already hold a Documents store ahead of those that do not.
 
+**T2.5 done 2026-07-21** — `IosDeviceSource` (physical iOS via `xcrun devicectl`), verified live on a
+real iPhone. All three `DeviceSource` backends now exist; the platform matrix in
+[ADR-0007](adr/0007-device-source-per-platform.md) is complete. **112 tests pass.**
+
 **What remains (all optional / deferred):**
-- **T2.5** — `IosDeviceSource` (physical iOS via `xcrun devicectl`).
 - **JetBrains Marketplace** publishing (`signPlugin`/`publishPlugin`, screenshots, account/review).
 - Optional: render a CBOR array of all-small-ints (e.g. `session_key`'s AES bytes) compactly rather
   than as a long number list.
@@ -88,7 +91,7 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
       from `adb devices -l` (skips offline/unauthorized; model → display name); the Connect action
       auto-picks a single device or shows a chooser, then prompts for the app package. 7 tests.
 - [x] **T2.4** `IosSimulatorSource` — resolves the container via
-      `xcrun simctl get_app_container <udid> <bundleId> data`, then reads `Documents/mmkv/` off the
+      `xcrun simctl get_app_container <udid> <bundleId> data`, then reads `Documents/MMKV/` off the
       Mac filesystem (pairs each main file with its `.crc`). `Simctl` seam (interface + `ProcessSimctl`)
       and a `CollectionFiles` seam (`LocalFiles` real) keep it testable without a simulator.
       `IosSimulators.listBooted/parse` enumerates **booted** sims from `simctl list devices booted -j`
@@ -96,8 +99,24 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
       (`IosSimulatorsTest` 8, `IosSimulatorSourceTest` 4). Parser validated against real `simctl -j`
       output. **Not yet exercised end-to-end live** (needs a booted sim with the Documents iOS sample
       installed).
-- [ ] **T2.5** `IosDeviceSource` — `xcrun devicectl device copy from …`. **Deferred** (a clean
-      additional backend, not a redesign).
+- [x] **T2.5** `IosDeviceSource` — physical iOS via `xcrun devicectl`. A device sandbox is not a
+      directory on the Mac, so files cannot be read in place: the container is listed
+      (`device info files … --subdirectory Documents/MMKV`), each collection is copied into a
+      temporary staging directory (`device copy from`), read back, and the directory deleted.
+      `Devicectl` + `PullTarget` seams keep it testable with no device. `IosDevices` also backs the
+      app-id prefill, filtering on `builtByDeveloper`. 18 tests
+      (`IosDevicesTest` 13, `IosDeviceSourceTest` 5). **Verified end-to-end live on a real iPhone**
+      (iPhone 13): launched the sample, pulled `documents.default` + `.crc`, decoded to the `Default`
+      collection with 3 documents. See [ADR-0009](adr/0009-ios-device-via-devicectl.md).
+      Live testing corrected four things unit tests could not have caught: `devicectl` **exits 0 even
+      on failure** (the JSON `error` object is the source of truth); `relativePath` is **relative to
+      the requested `--subdirectory`** (bare `cache`, not `Documents/MMKV/cache`) — parsing it as a
+      full path made the first live run report "No collections found"; prefill needed the same
+      store-first ranking as the simulator, but with **concurrent per-app probes** since the device
+      listing has no container path; and MMKV's iOS directory is
+      **`Documents/MMKV`** (uppercase) — a real device rejects `Documents/mmkv`, and the simulator
+      only tolerated it because the Mac's filesystem is case-insensitive. The constant is shared, so
+      this fixed a latent bug in `IosSimulatorSource` too.
 
 ## Phase 3 — Plugin shell (UI)
 
@@ -197,7 +216,7 @@ Two `simctl listapps` gotchas found live, both of which the implementation must 
       → only `User` ids (fixture captured live); malformed input → `emptyList()`. The existing 76
       tests must still pass.
 - [x] **T5.6** Rank simulator candidates by whether the app's sandbox already holds a Documents
-      store (`Documents/mmkv/`), so the prompt does not preselect an unrelated installed app that
+      store (`Documents/MMKV/`), so the prompt does not preselect an unrelated installed app that
       merely sorts first. Found in live testing: with no `.xcodeproj` in the open project the iOS
       list fell back to simulator apps alone and preselected `com.nexcore.bigbros` over the sample.
       The container path already comes back in the `listapps` output, so this adds no `simctl` calls;

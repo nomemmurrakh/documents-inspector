@@ -29,7 +29,7 @@ internal object LocalFiles : CollectionFiles {
  * A [DeviceSource] for a development-signed app on a **booted iOS simulator** (macOS + Xcode only).
  *
  * `xcrun simctl get_app_container <udid> <bundleId> data` resolves the app's data container to a
- * directory on the Mac; the collections live in `Documents/mmkv/` inside it (the Documents library
+ * directory on the Mac; the collections live in `Documents/MMKV/` inside it (the Documents library
  * writes to `NSDocumentDirectory`). From there it is plain file I/O: list the directory, pair each
  * main file with its `.crc` sibling, and read both. See
  * `docs/adr/0007-device-source-per-platform.md` and `docs/adr/0005-body-size-from-crc.md`.
@@ -66,7 +66,12 @@ internal class IosSimulatorSource(
     }
 
     internal companion object {
-        const val MMKV_SUBPATH = "Documents/mmkv"
+        /**
+         * MMKV's default directory on iOS, which it creates as `MMKV` (uppercase) under the app's
+         * `Documents`. The case matters: a real device rejects `Documents/mmkv`, and only the Mac's
+         * case-insensitive filesystem lets the simulator tolerate it.
+         */
+        const val MMKV_SUBPATH = "Documents/MMKV"
         private const val CRC_SUFFIX = ".crc"
     }
 }

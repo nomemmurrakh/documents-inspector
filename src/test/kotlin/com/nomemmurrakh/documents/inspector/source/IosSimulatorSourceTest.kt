@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class IosSimulatorSourceTest {
 
     private val container = "/sim/data/Containers/Data/Application/ABC"
-    private val mmkvDir = "$container/Documents/mmkv"
+    private val mmkvDir = "$container/Documents/MMKV"
 
     private fun simctlResolving(path: String = container) = object : Simctl {
         override fun run(args: List<String>): SimctlResult =

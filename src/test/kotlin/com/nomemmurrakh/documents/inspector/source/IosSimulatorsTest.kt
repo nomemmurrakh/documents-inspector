@@ -171,7 +171,7 @@ class IosSimulatorsTest {
 
     private fun filesWithStoreAt(vararg dirs: String) = object : CollectionFiles {
         override fun listNames(dir: String): List<String> =
-            if (dirs.any { dir == "$it/Documents/mmkv" }) listOf("documents.default", "documents.default.crc")
+            if (dirs.any { dir == "$it/Documents/MMKV" }) listOf("documents.default", "documents.default.crc")
             else emptyList()
 
         override fun read(dir: String, name: String) = ByteArray(0)

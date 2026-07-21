@@ -86,8 +86,8 @@ same reader.
 | Source | Mechanism | MMKV dir on target | Effort | Host requirement |
 | --- | --- | --- | --- | --- |
 | Android device / emulator | `adb exec-out run-as <pkg> cat files/mmkv/<file>` | `/data/data/<pkg>/files/mmkv/` | baseline | any OS |
-| **iOS Simulator** | `xcrun simctl get_app_container <udid> <bundleId> data` → plain file reads | `<sandbox>/Documents/mmkv/` | low | macOS + Xcode |
-| iOS physical device | `xcrun devicectl device copy from …` (Xcode 15+) | app container `Documents/mmkv/` | medium | macOS + Xcode, paired dev-signed device |
+| **iOS Simulator** | `xcrun simctl get_app_container <udid> <bundleId> data` → plain file reads | `<sandbox>/Documents/MMKV/` | low | macOS + Xcode |
+| **iOS physical device** | `xcrun devicectl device copy from …` (Xcode 15+) → local staging dir | app container `Documents/MMKV/` | medium | macOS + Xcode, paired dev-signed device |
 
 The iOS simulator is just a directory on the Mac's filesystem, so once the sandbox path is
 resolved it is plain file I/O — identical to Android once the bytes are local. There is no
@@ -98,7 +98,7 @@ resolved it is plain file I/O — identical to Android once the bytes are local.
 1. **Android (`adb run-as`)** — baseline, proves the reader end to end.
 2. **iOS Simulator (`simctl`)** — low cost, covers most real inspection needs, proves the
    cross-platform tree.
-3. **iOS physical device (`devicectl`)** — deferred; a clean additional `DeviceSource`, not a
+3. **iOS physical device (`devicectl`)** — done (T2.5); a clean additional `DeviceSource`, not a
    redesign.
 
 ## Access constraints

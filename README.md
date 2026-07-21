@@ -6,10 +6,10 @@ library, rendering them as a browsable tree of **collections → documents → t
 
 ## Status
 
-Working on **Android and iOS simulator**, verified live against the Documents sample app. Reads a
-store as a three-pane tree (collections → documents → fields), rendering each document as
-syntax-highlighted JSON or plain text. Physical-iOS acquisition and Marketplace publishing are the
-remaining items — see [`docs/tasks.md`](docs/tasks.md).
+Working on **Android, the iOS simulator, and physical iOS devices**, each verified live against the
+Documents sample app. Reads a store as a three-pane tree (collections → documents → fields),
+rendering each document as syntax-highlighted JSON or plain text. Marketplace publishing is the
+remaining item — see [`docs/tasks.md`](docs/tasks.md).
 
 ## How it works
 
@@ -22,7 +22,7 @@ behind per-platform acquisition backends:
 
 - **Android** device / emulator — `adb exec-out run-as <pkg> …`
 - **iOS Simulator** — `xcrun simctl` (the simulator sandbox is a directory on the Mac)
-- **iOS physical device** — `xcrun devicectl` (deferred to a later phase)
+- **iOS physical device** — `xcrun devicectl` (paired, development-signed device)
 
 Encrypted fields (written via a `FieldDecorator`) render as opaque blobs — the inspector is a
 plaintext tool.
@@ -49,10 +49,11 @@ The plugin is not yet on the JetBrains Marketplace; install the built zip from d
 1. Run a **debuggable** (Android) or **development-signed** (iOS) build of your app on a device,
    emulator, or booted simulator.
 2. Open the **Documents Inspector** tool window and click **Connect**.
-3. Choose the platform (Android device / iOS simulator) and pick the target. The app id prompt is
-   **prefilled from the open project** — the Android application id of each app module, or the
-   bundle id from the Xcode project (falling back to the apps installed on the simulator). Confirm
-   it, pick another from the dropdown, or type any id to inspect an app whose sources are not open.
+3. Choose the platform (Android device / iOS simulator / iOS device) and pick the target. The app id
+   prompt is **prefilled from the open project** — the Android application id of each app module, or
+   the bundle id from the Xcode project (falling back to the apps installed on the selected
+   simulator or device). Confirm it, pick another from the dropdown, or type any id to inspect an
+   app whose sources are not open.
 4. Browse: pick a collection, then a document, and read its fields as JSON or plain text. Encrypted
    (`FieldDecorator`) fields show masked. **Refresh** reloads the last target.
 

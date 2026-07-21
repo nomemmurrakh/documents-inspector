@@ -22,8 +22,12 @@ Acquisition mechanisms per backend:
 | Backend | Mechanism | MMKV dir on target |
 | --- | --- | --- |
 | `AndroidAdbSource` | `adb [-s <serial>] exec-out run-as <pkg> cat files/mmkv/<file>` | `/data/data/<pkg>/files/mmkv/` |
-| `IosSimulatorSource` | `xcrun simctl get_app_container <udid> <bundleId> data` → file reads | `<sandbox>/Documents/mmkv/` |
-| `IosDeviceSource` (later) | `xcrun devicectl device copy from …` | app container `Documents/mmkv/` |
+| `IosSimulatorSource` | `xcrun simctl get_app_container <udid> <bundleId> data` → file reads | `<sandbox>/Documents/MMKV/` |
+| `IosDeviceSource` | `xcrun devicectl device copy from …` → local staging dir | app container `Documents/MMKV/` |
+
+All three backends are now implemented. The iOS directory is `Documents/MMKV` (uppercase) — see
+[ADR-0009](0009-ios-device-via-devicectl.md), which also covers why the device backend stages files
+locally instead of reading them in place.
 
 ## Consequences
 

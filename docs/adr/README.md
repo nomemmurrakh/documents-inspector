@@ -13,3 +13,4 @@ with its status updated to point at the ADR that replaced it.
 | [0006](0006-mmkv-length-prefix-then-cbor.md) | Each stored value is MMKV-length-prefixed, then CBOR — strip the prefix before decoding | Accepted | 2026-07-20 |
 | [0007](0007-device-source-per-platform.md) | One `DeviceSource` interface per platform; the reader is shared | Accepted | 2026-07-20 |
 | [0008](0008-prefill-app-id-from-the-ide.md) | Prefill the app id from the IDE, but keep the prompt editable | Accepted | 2026-07-21 |
+| [0009](0009-ios-device-via-devicectl.md) | Reach physical iOS devices with `devicectl`, staging files locally | Accepted | 2026-07-21 |

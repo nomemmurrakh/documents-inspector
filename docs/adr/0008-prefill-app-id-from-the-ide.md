@@ -37,7 +37,7 @@ Preselection order is **last explicit choice → first detected candidate**, so 
 selection is never overridden by detection.
 
 Within the iOS simulator fallback, candidates are ordered by whether the app's sandbox already
-contains a Documents store (`Documents/mmkv/`), not by the order `simctl` happens to report them.
+contains a Documents store (`Documents/MMKV/`), not by the order `simctl` happens to report them.
 That ordering was added after live testing showed an unrelated installed app preselected simply
 because its bundle id sorted first. The container path is already present in the `listapps` output,
 so the check costs one directory probe per app and no extra `simctl` calls. It is a ranking signal
@@ -68,8 +68,9 @@ id, applying `applicationIdSuffix`. A debug build of `com.example.app` installs 
 - `simctl listapps` needs two workarounds, both verified live: its output is NeXTSTEP plist rather
   than JSON (`-j` is accepted but ignored), so it is converted with `plutil -convert json`; and it
   **exits 0 even on failure**, so its exit code cannot be trusted and unparseable output is treated
-  as "no candidates". This is the only place in the codebase where a tool's exit code is
-  deliberately ignored, so it is called out in the code and in [`tasks.md`](../tasks.md).
+  as "no candidates". It is called out in the code and in [`tasks.md`](../tasks.md).
+  ([ADR-0009](0009-ios-device-via-devicectl.md) later found `devicectl` behaves the same way, so
+  ignoring an Apple tool's exit code is a pattern here, not a one-off.)
 
 ## Alternatives considered
 

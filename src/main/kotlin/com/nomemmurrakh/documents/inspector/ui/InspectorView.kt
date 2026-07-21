@@ -19,9 +19,11 @@ import com.nomemmurrakh.documents.inspector.source.AdbDevices
 import com.nomemmurrakh.documents.inspector.source.AppIdCandidates
 import com.nomemmurrakh.documents.inspector.source.DeviceSource
 import com.nomemmurrakh.documents.inspector.source.DeviceSourceException
+import com.nomemmurrakh.documents.inspector.source.IosDevices
 import com.nomemmurrakh.documents.inspector.source.IosSimulator
 import com.nomemmurrakh.documents.inspector.source.IosSimulators
 import com.nomemmurrakh.documents.inspector.source.ProcessAdb
+import com.nomemmurrakh.documents.inspector.source.ProcessDevicectl
 import com.nomemmurrakh.documents.inspector.source.ProcessSimctl
 import java.awt.BorderLayout
 import javax.swing.JComponent
@@ -96,6 +98,7 @@ internal class InspectorView(private val project: Project) {
             when (platform) {
                 Platform.ANDROID -> connectAndroid()
                 Platform.IOS_SIMULATOR -> connectIosSimulator()
+                Platform.IOS_DEVICE -> connectIosDevice()
             }
         }
     }
@@ -156,6 +159,55 @@ internal class InspectorView(private val project: Project) {
                 )
             }
         }
+    }
+
+    private fun connectIosDevice() {
+        inBackground("Listing iOS devices", { runCatching { IosDevices.list(ProcessDevicectl()) } }) { listed ->
+            val devices = listed.getOrElse { ex ->
+                panel.showMessage((ex as? DeviceSourceException)?.message ?: "Could not list iOS devices.")
+                return@inBackground
+            }
+            if (devices.isEmpty()) {
+                panel.showMessage("No paired iOS device found. Connect one and trust this Mac, then try again.")
+                return@inBackground
+            }
+            chooseFrom(devices, "Select Device", { it.displayName }) { device ->
+                val detect = {
+                    AppIdCandidates.merge(
+                        AppIdDetector.iosCandidates(project),
+                        IosDevices.listApps(ProcessDevicectl(), device.identifier),
+                    )
+                }
+                withCandidates(detect) { candidates ->
+                    val bundleId = promptForApp(
+                        "Bundle identifier of the app to inspect:",
+                        candidates,
+                    ) ?: return@withCandidates
+                    loadInBackground(
+                        Target(bundleId, device.displayName) {
+                            InspectorController.iosDeviceSource(ProcessDevicectl(), device.identifier, bundleId)
+                        },
+                    )
+                }
+            }
+        }
+    }
+
+    private fun <T> inBackground(title: String, work: () -> T, onReady: (T) -> Unit) {
+        ProgressManager.getInstance().run(
+            object : Task.Backgroundable(project, title, false) {
+                private var outcome: Result<T> = Result.failure(IllegalStateException("Not run"))
+
+                override fun run(indicator: ProgressIndicator) {
+                    outcome = runCatching(work)
+                }
+
+                override fun onFinished() {
+                    val value = outcome.getOrNull() ?: return
+                    ApplicationManager.getApplication().invokeLater { onReady(value) }
+                }
+            },
+        )
     }
 
     private fun withCandidates(detect: () -> List<String>, onReady: (List<String>) -> Unit) {
@@ -230,6 +282,7 @@ internal class InspectorView(private val project: Project) {
     private enum class Platform(val label: String) {
         ANDROID("Android device / emulator"),
         IOS_SIMULATOR("iOS simulator"),
+        IOS_DEVICE("iOS device"),
     }
 
     private fun render(result: LoadResult) = ApplicationManager.getApplication().invokeLater {
