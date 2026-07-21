@@ -16,11 +16,13 @@ Phases 0–4 are done. The plugin has been **verified live on Android (real devi
 simulator** against the Documents sample app (`com.nomemmurrakh.documents.sample`);
 `buildPlugin` produces `documents-inspector-0.1.0.zip`; `verifyPlugin` → Compatible.
 
-**Phase 5 (post-0.1.0) — done and verified live.** The Connect prompt is prefilled from the open
-project and stays editable. See [ADR-0008](adr/0008-prefill-app-id-from-the-ide.md). **94 tests
-pass** (76 + 18 new). Live iOS testing surfaced one ordering bug — with no `.xcodeproj` in the open
-project the list fell back to simulator apps alone and preselected an unrelated app that sorted
-first; fixed in T5.6 by ranking apps that already hold a Documents store ahead of those that do not.
+**Phase 5 (post-0.1.0) — done, verified live on both platforms** (Android prefilled the package name;
+iOS offered the installed apps with the sample preselected). The Connect prompt is prefilled from the
+open project and stays editable. Committed in `b7a24ef`. See
+[ADR-0008](adr/0008-prefill-app-id-from-the-ide.md). **94 tests pass** (76 + 18 new). Live iOS
+testing surfaced one ordering bug — with no `.xcodeproj` in the open project the list fell back to
+simulator apps alone and preselected an unrelated app that sorted first; fixed in T5.6 by ranking
+apps that already hold a Documents store ahead of those that do not.
 
 **What remains (all optional / deferred):**
 - **T2.5** — `IosDeviceSource` (physical iOS via `xcrun devicectl`).
@@ -202,11 +204,16 @@ Two `simctl listapps` gotchas found live, both of which the implementation must 
       it reuses the `CollectionFiles` seam and so stays testable. Ranking only — every user app is
       still offered. 4 tests.
 
-**Live verification:** Android — `runIde`, open the `documents` repo, Connect → Android → device;
-the prompt should prefill `com.nomemmurrakh.documents.sample`, list app modules only, and still
-accept a typed id. iOS — boot the iPhone 17 Pro sim, Connect → iOS simulator; prefill comes from the
-pbxproj. Fallback — open a project with no `.xcodeproj` and confirm the sim's `User` apps are
-offered. Degradation — open a non-Android, non-iOS project and confirm a plain empty box with no error.
+**Live verification — done 2026-07-21, both platforms.**
+
+- **Android** — the prompt prefilled the app module's package name correctly.
+- **iOS** — the prompt offered every user-installed app with the sample preselected. This is the
+  path that exposed the ranking bug fixed in T5.6: before it, the fallback preselected
+  `com.nexcore.bigbros` purely because it sorted first.
+
+Still unexercised (both low-risk, covered by unit tests): the **degradation** path — a project that
+is neither Android nor iOS should show the plain input box with no error — and a **multi-app-module**
+Android project, where the dropdown should list every app module and no library modules.
 
 ---
 
