@@ -40,11 +40,9 @@ launch, so restart the sandbox to pick up code changes. For iOS, the sample buil
 2.4.0 pin (commit `f085105` in the documents repo). If the sandbox wedges with "AnalyticsSettings
 before initialization", `rm -rf build/idea-sandbox/*/config build/idea-sandbox/*/system`.
 
-**Unpushed:** the inspector repo is ahead of `origin/master` (ask before pushing, per the rule).
-
 ---
 
-## Phase 0 — Scaffold  *(done — committed in `f5122a3`)*
+## Phase 0 — Scaffold  *(done)*
 
 - [x] **T0.1** Empty plugin skeleton: IntelliJ Platform Gradle Plugin 2.10.0,
       `androidStudio("2025.1.1.14")`, bundled `org.jetbrains.android`, Kotlin 2.4.0, JDK 21,
@@ -55,7 +53,7 @@ before initialization", `rm -rf build/idea-sandbox/*/config build/idea-sandbox/*
 - [x] **T0.4** `kotlinx-serialization-cbor` dependency + `kotlin("plugin.serialization")` (tests use
       `@Serializable` fixtures).
 
-## Phase 1 — Reader core (pure Kotlin/JVM, platform-agnostic)  *(done — committed in `f5122a3`)*
+## Phase 1 — Reader core (pure Kotlin/JVM, platform-agnostic)  *(done)*
 
 - [x] **T1.1** `MmkvCrcHeader` — parse the `.crc` metafile (`crc32`, `iv`, `real_size`). Port of the
       crate's `cipher.rs`. Tests. See [ADR-0005](adr/0005-body-size-from-crc.md).
