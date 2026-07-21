@@ -10,34 +10,35 @@ Ordered, independently testable units. Build top to bottom; each task should com
 
 Legend: `[x]` done · `[~]` partially done · `[ ]` not started.
 
-## Current state (0.1.0 — feature-complete)
+## Current state
 
-Phases 0–4 are done. The plugin has been **verified live on Android (real device) and the iOS
-simulator** against the Documents sample app (`com.nomemmurrakh.documents.sample`);
-`buildPlugin` produces `documents-inspector-0.1.0.zip`; `verifyPlugin` → Compatible.
+**Every phase below is done, and 0.1.0 is complete but not yet released.** All three acquisition
+backends have been exercised end-to-end against the Documents sample app
+(`com.nomemmurrakh.documents.sample`) on real hardware:
 
-**Phase 5 (post-0.1.0) — done, verified live on both platforms** (Android prefilled the package name;
-iOS offered the installed apps with the sample preselected). The Connect prompt is prefilled from the
-open project and stays editable. Committed in `b7a24ef`. See
-[ADR-0008](adr/0008-prefill-app-id-from-the-ide.md). **94 tests pass** (76 + 18 new). Live iOS
-testing surfaced one ordering bug — with no `.xcodeproj` in the open project the list fell back to
-simulator apps alone and preselected an unrelated app that sorted first; fixed in T5.6 by ranking
-apps that already hold a Documents store ahead of those that do not.
+| Target | Backend | Live check |
+| --- | --- | --- |
+| Android device / emulator | `AndroidAdbSource` (`adb run-as`) | Galaxy SM-A536E |
+| iOS simulator | `IosSimulatorSource` (`simctl`) | iPhone 17 Pro sim |
+| iOS device | `IosDeviceSource` (`devicectl`) | iPhone 13 |
 
-**T2.5 done 2026-07-21** — `IosDeviceSource` (physical iOS via `xcrun devicectl`), verified live on a
-real iPhone. All three `DeviceSource` backends now exist; the platform matrix in
-[ADR-0007](adr/0007-device-source-per-platform.md) is complete. **112 tests pass.**
+**117 tests pass.** `buildPlugin` produces `documents-inspector-0.1.0.zip`; `verifyPlugin` →
+Compatible.
 
-**What remains (all optional / deferred):**
-- **JetBrains Marketplace** publishing (`signPlugin`/`publishPlugin`, screenshots, account/review).
+**What remains:**
+- **JetBrains Marketplace** publishing (`signPlugin`/`publishPlugin`, screenshots, account/review) —
+  gated on having an account, not on code. Until then the plugin is side-loaded from the zip.
 - Optional: render a CBOR array of all-small-ints (e.g. `session_key`'s AES bytes) compactly rather
   than as a long number list.
+- Two UI paths are unit-tested but never clicked through: a project that is neither Android nor iOS
+  (should show a plain input box, no error), and a multi-app-module Android project (the dropdown
+  should list every app module and no library modules).
 
-**To resume a live test:** boot the iPhone 17 Pro sim, ensure the sample app is installed (it builds
-after the MMKV SPM 2.4.0 pin — commit `f085105` in the documents repo), then `./gradlew runIde`,
-open any project, **Documents Inspector** tool window → Connect → iOS simulator → bundle
-`com.nomemmurrakh.documents.sample`. `runIde` bakes the plugin at launch, so restart it to pick up
-code changes.
+**To run a live check:** `./gradlew runIde`, open any project (the tool window is project-scoped),
+then **Documents Inspector** → Connect → pick a platform and target. `runIde` bakes the plugin at
+launch, so restart the sandbox to pick up code changes. For iOS, the sample builds after the MMKV SPM
+2.4.0 pin (commit `f085105` in the documents repo). If the sandbox wedges with "AnalyticsSettings
+before initialization", `rm -rf build/idea-sandbox/*/config build/idea-sandbox/*/system`.
 
 **Unpushed:** the inspector repo is ahead of `origin/master` (ask before pushing, per the rule).
 
@@ -85,7 +86,7 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
 - [x] **T2.2** `AndroidAdbSource` — enumerate `files/mmkv/` and pull each main + `.crc` via
       `adb exec-out run-as <pkg> …`; pin the target with `-s <serial>` when given; map
       not-debuggable / unknown-package / multiple-devices / no-devices failures to clear messages.
-      `adb` is behind an injectable `Adb` seam (`ProcessAdb` real, fake in tests), so the 12
+      `adb` is behind an injectable `Adb` seam (`ProcessAdb` real, fake in tests), so the 13
       `AndroidAdbSourceTest` cases verify command construction + parsing with no live device.
 - [x] **T2.3** Device/package selection plumbing. `AdbDevices.list/parse` enumerates ready devices
       from `adb devices -l` (skips offline/unauthorized; model → display name); the Connect action
@@ -95,17 +96,16 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
       Mac filesystem (pairs each main file with its `.crc`). `Simctl` seam (interface + `ProcessSimctl`)
       and a `CollectionFiles` seam (`LocalFiles` real) keep it testable without a simulator.
       `IosSimulators.listBooted/parse` enumerates **booted** sims from `simctl list devices booted -j`
-      (kotlinx-serialization-json); the Connect action now asks Android vs iOS first. 12 tests
-      (`IosSimulatorsTest` 8, `IosSimulatorSourceTest` 4). Parser validated against real `simctl -j`
-      output. **Not yet exercised end-to-end live** (needs a booted sim with the Documents iOS sample
-      installed).
+      (kotlinx-serialization-json); the Connect action asks which platform first. 20 tests
+      (`IosSimulatorsTest` 16, `IosSimulatorSourceTest` 4). Parser validated against real `simctl -j`
+      output. **Verified end-to-end live** on an iPhone 17 Pro simulator.
 - [x] **T2.5** `IosDeviceSource` — physical iOS via `xcrun devicectl`. A device sandbox is not a
       directory on the Mac, so files cannot be read in place: the container is listed
       (`device info files … --subdirectory Documents/MMKV`), each collection is copied into a
       temporary staging directory (`device copy from`), read back, and the directory deleted.
       `Devicectl` + `PullTarget` seams keep it testable with no device. `IosDevices` also backs the
-      app-id prefill, filtering on `builtByDeveloper`. 18 tests
-      (`IosDevicesTest` 13, `IosDeviceSourceTest` 5). **Verified end-to-end live on a real iPhone**
+      app-id prefill, filtering on `builtByDeveloper`. 23 tests
+      (`IosDevicesTest` 18, `IosDeviceSourceTest` 5). **Verified end-to-end live on a real iPhone**
       (iPhone 13): launched the sample, pulled `documents.default` + `.crc`, decoded to the `Default`
       collection with 3 documents. See [ADR-0009](adr/0009-ios-device-via-devicectl.md).
       Live testing corrected four things unit tests could not have caught: `devicectl` **exits 0 even
@@ -120,9 +120,10 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
 
 ## Phase 3 — Plugin shell (UI)
 
-- [x] **T3.1** Tree model over `Collection → Document → Field`, with each `DocumentValue` rendered
-      per node — scalars inline, containers summarized and expanded, `Opaque`/`Bytes` as labeled
-      blobs. `DocumentValueRenderer` (pure) + `InspectorTreeModel` (Swing nodes); 12 tests.
+- [x] **T3.1** ~~Tree model over `Collection → Document → Field`~~ — **superseded by T3.3.** Built as
+      `DocumentValueRenderer` (pure) + `InspectorTreeModel` (Swing nodes) with 12 tests, then removed
+      when the single tree became the three-pane view. Neither class nor its tests remain, so they
+      are not part of the current test count.
 - [x] **T3.2** `InspectorView` wraps the `InspectorPanel` tree with a toolbar (Connect / Refresh
       actions). Connect resolves a device + package and runs `InspectorController.load` on a
       background task; the result renders on the EDT. Refresh re-runs the last target.
@@ -132,7 +133,7 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
       Document content**, side by side via nested `JBSplitter`s. The content pane has a view-mode
       dropdown — **JSON** (pretty-printed; list→array, map→object) or **Plain text** (`field: value`
       lines). `Opaque`/`Bytes` values (decorator-encrypted) render as length-hinted asterisk masks,
-      never raw bytes. `DocumentView` (pure JSON/plain renderer, 8 tests) + `InspectorPanel`
+      never raw bytes. `DocumentView` (pure JSON/plain renderer, 9 tests) + `InspectorPanel`
       rewrite. The earlier `InspectorTreeModel`/`DocumentValueRenderer` were removed as superseded.
 - [x] **T3.4** Error + empty states. `InspectorController` turns `DeviceSourceException` (no device,
       not debuggable, unknown package, multiple devices) and decode errors into `LoadResult.Failed`
@@ -164,11 +165,11 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
 
 ## Phase 5 — Prefill the app id in the Connect prompt
 
-The Connect flow asks for the application id / bundle identifier with a bare input dialog seeded only
-by the previous target, so the first connect of a session always starts empty. The IDE usually knows
-the answer already. Detect it and prefill, while keeping the prompt editable so another app can still
-be inspected. See [ADR-0008](adr/0008-prefill-app-id-from-the-ide.md) for the decision and the
-alternatives rejected.
+The Connect flow used to ask for the application id / bundle identifier with a bare input dialog
+seeded only by the previous target, so the first connect of a session always started empty — even
+though the IDE usually knows the answer. It is now detected and prefilled, with the prompt kept
+editable so another app can still be inspected. See
+[ADR-0008](adr/0008-prefill-app-id-from-the-ide.md) for the decision and the alternatives rejected.
 
 **Verified during planning** (against Android Studio `AI-251.25410.109.2511.13752376`, and by running
 the CLIs live) — these are confirmed present, not assumed:
@@ -213,26 +214,25 @@ Two `simctl listapps` gotchas found live, both of which the implementation must 
       pattern; the facet reads need a read action.
 - [x] **T5.5** Tests — `AppIdCandidatesTest`: pbxproj literal extraction (fixture from the real
       sample), `$(…)` variables skipped, test targets skipped, duplicates collapsed; `listapps` JSON
-      → only `User` ids (fixture captured live); malformed input → `emptyList()`. The existing 76
-      tests must still pass.
+      → only `User` ids (fixture captured live); malformed input → `emptyList()`. 10 tests.
 - [x] **T5.6** Rank simulator candidates by whether the app's sandbox already holds a Documents
       store (`Documents/MMKV/`), so the prompt does not preselect an unrelated installed app that
       merely sorts first. Found in live testing: with no `.xcodeproj` in the open project the iOS
       list fell back to simulator apps alone and preselected `com.nexcore.bigbros` over the sample.
       The container path already comes back in the `listapps` output, so this adds no `simctl` calls;
       it reuses the `CollectionFiles` seam and so stays testable. Ranking only — every user app is
-      still offered. 4 tests.
+      still offered. 4 tests (inside `IosSimulatorsTest`, so already counted under T2.4).
 
-**Live verification — done 2026-07-21, both platforms.**
+**Live verification — done 2026-07-21, all three targets.**
 
 - **Android** — the prompt prefilled the app module's package name correctly.
-- **iOS** — the prompt offered every user-installed app with the sample preselected. This is the
-  path that exposed the ranking bug fixed in T5.6: before it, the fallback preselected
+- **iOS simulator** — offered every user-installed app with the sample preselected. This is the path
+  that exposed the ranking bug fixed in T5.6: before it, the fallback preselected
   `com.nexcore.bigbros` purely because it sorted first.
+- **iOS device** — the same ranking, added in T2.5 once the device path shipped, since the device
+  listing has no container path to check locally.
 
-Still unexercised (both low-risk, covered by unit tests): the **degradation** path — a project that
-is neither Android nor iOS should show the plain input box with no error — and a **multi-app-module**
-Android project, where the dropdown should list every app module and no library modules.
+The two paths still unexercised in the UI are listed under *Current state* above.
 
 ---
 

@@ -59,16 +59,16 @@ platform-specific.
 
 ```
 ┌─────────────────────────────────────────────┐
-│ IntelliJ plugin shell                        │  Tool window, tree UI, actions,
-│ (InspectorToolWindowFactory, tree model)     │  value/detail panel
+│ IntelliJ plugin shell                        │  Tool window, three-pane view,
+│ (InspectorToolWindowFactory → InspectorView) │  Connect / Refresh actions
 ├─────────────────────────────────────────────┤
 │ Reader core  (pure Kotlin/JVM)               │  MMKV file → keys → group by "::"
-│                                              │  → CBOR-decode → render tree
+│                                              │  → CBOR-decode → Collection tree
 ├─────────────────────────────────────────────┤
 │ DeviceSource  (acquisition, per platform)    │  "give me a local copy of the
 │  ├─ AndroidAdbSource                         │   mmkv files for this app"
 │  ├─ IosSimulatorSource                       │
-│  └─ IosDeviceSource   (later)                │
+│  └─ IosDeviceSource                          │
 └─────────────────────────────────────────────┘
 ```
 
@@ -93,13 +93,17 @@ The iOS simulator is just a directory on the Mac's filesystem, so once the sandb
 resolved it is plain file I/O — identical to Android once the bytes are local. There is no
 "adb for iOS"; physical-device access requires Apple's `devicectl` and a development-signed app.
 
-### Planned order
+### Build order
 
-1. **Android (`adb run-as`)** — baseline, proves the reader end to end.
-2. **iOS Simulator (`simctl`)** — low cost, covers most real inspection needs, proves the
+All three shipped, in this order — each a new `DeviceSource` backend with no reader changes, which
+is the design working as intended:
+
+1. **Android (`adb run-as`)** — baseline, proved the reader end to end.
+2. **iOS Simulator (`simctl`)** — low cost, covers most real inspection needs, proved the
    cross-platform tree.
-3. **iOS physical device (`devicectl`)** — done (T2.5); a clean additional `DeviceSource`, not a
-   redesign.
+3. **iOS physical device (`devicectl`)** — the only backend that cannot read files in place, since a
+   device sandbox is not a directory on the Mac; it stages copies locally instead. See
+   [ADR-0009](adr/0009-ios-device-via-devicectl.md).
 
 ## Access constraints
 
@@ -200,17 +204,20 @@ The reader strips that inner length prefix before CBOR-decoding. On the real fil
 (enum `LIGHT`) as `06 · 65"LIGHT"` — the leading byte is MMKV's length (5, 1, 6), and the remainder
 is exactly the standalone kotlinx-serialization-cbor encoding.
 
-This was traced end to end through the shipped `0.1.0` bytecode: `DocumentEncoder` →
+This was traced end to end through the shipped `com.nomemmurrakh:documents:0.1.0` library bytecode
+(not this plugin, which coincidentally shares the version): `DocumentEncoder` →
 `cbor.encodeToByteArray` (plain CBOR, no prefix) → `applyWrap` (identity when no decorators) →
 `MmkvStorage.putBytes` → `MMKV.encode(key, byte[])`, where MMKV adds the length prefix. The Rust
 oracle does **not** strip this (it returns MMKV's raw stored value); unwrapping the `byte[]`
 container is one layer above what the oracle parses.
 
-### Effort
+### Outcome
 
-Small — a varint decoder, the header + entry loop, and the latest-wins dedupe: on the order of
-150–300 lines of Kotlin, matching the Rust reference. No native dependencies; the previously-open
-technical risk is closed.
+Shipped as ~500 lines of Kotlin across `reader/` (varint decoding, the `.crc` header, the entry loop
+with latest-wins dedupe, the CBOR walker, and the collection grouping), with no native dependencies.
+The technical risk this section was written to assess is closed: the reader decodes real files from
+Android, the iOS simulator, and a physical iPhone, and is checked against the Rust crate's golden
+output by `RealFileOracleTest`.
 
 Note this MMKV-level encryption is distinct from Documents' `FieldDecorator` encryption (per-value,
 at the CBOR layer) covered under Limitations — two independent layers.

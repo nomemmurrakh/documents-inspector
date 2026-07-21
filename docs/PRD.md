@@ -1,8 +1,8 @@
 # Documents Inspector — Product Requirements Document
 
-**Status:** Draft v1.0
+**Status:** v1.0 — all goals and success criteria met by the unreleased 0.1.0 build
 **Owner:** Nomem Labs
-**Last updated:** 2026-07-20
+**Last updated:** 2026-07-21
 
 ---
 
@@ -77,7 +77,8 @@ Explicitly out of scope for the first release — do **not** build these:
   and shows each field's decoded value — matching what the app wrote.
 - A value written through a `FieldDecorator` shows as an opaque blob, clearly labeled, without
   breaking the surrounding tree.
-- The same reader, unchanged, renders files pulled from Android and from an iOS simulator.
+- The same reader, unchanged, renders files pulled from Android, an iOS simulator, and a physical
+  iOS device.
 - No native library is bundled; the plugin builds and loads as a pure-JVM artifact.
 
 ## 7. Constraints

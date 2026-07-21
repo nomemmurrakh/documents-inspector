@@ -1,9 +1,10 @@
 # On-disk format reference
 
-The authoritative spec for the bytes the inspector's reader parses. Verified 2026-07-20 against real
-files pulled from a device (`com.nomemmurrakh.documents.sample`, `files/mmkv/`) and cross-checked
-with the Rust oracle ([ADR-0003](adr/0003-rust-mmkv-parser-oracle.md)). Where a fact was corrected
-during that verification, the ADR that records it is linked.
+The authoritative spec for the bytes the inspector's reader parses. Verified against real files from
+the Documents sample app (`com.nomemmurrakh.documents.sample`) and cross-checked with the Rust oracle
+([ADR-0003](adr/0003-rust-mmkv-parser-oracle.md)) — first on Android (2026-07-20), then on the iOS
+simulator and a physical iPhone (2026-07-21), which decode with the same reader and no format
+differences. Where a fact was corrected during verification, the ADR that records it is linked.
 
 This document describes *what the bytes are*. `docs/design.md` describes *how the plugin is built*.
 
@@ -11,12 +12,23 @@ This document describes *what the bytes are*. `docs/design.md` describes *how th
 
 ## 1. Files per collection
 
-A Documents collection is stored as **two** files in the app's `files/mmkv/` directory:
+A Documents collection is stored as **two** files in the app's MMKV directory:
 
 | File | Role |
 | --- | --- |
 | `<collectionName>` | the main file — the append-only body of key/value entries |
 | `<collectionName>.crc` | the metafile — CRC32, AES-128-CFB IV, and the authoritative body size |
+
+That directory is MMKV's per-platform default, and the **case differs**:
+
+| Platform | MMKV directory |
+| --- | --- |
+| Android | `files/mmkv/` inside app-private storage |
+| iOS (simulator and device) | `Documents/MMKV/` inside the app container |
+
+The iOS spelling is uppercase. A physical device rejects `Documents/mmkv`; the simulator only
+tolerates it because macOS is case-insensitive
+([ADR-0009](adr/0009-ios-device-via-devicectl.md)).
 
 The default collection's `<collectionName>` is `documents.default` (the library's
 `DEFAULT_STORE_ID`); the plugin labels that file "Default" and shows every other file by its raw

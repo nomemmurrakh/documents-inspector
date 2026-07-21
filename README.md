@@ -17,8 +17,8 @@ Each Documents *collection* is one MMKV file (filename == collection name; the d
 is `documents.default`). The plugin acquires those files from a running, debuggable app, reads
 their `{document}::{field}` keys, and CBOR-decodes each field value for display. No native code.
 
-Documents is Kotlin Multiplatform, so the inspector targets both platforms through a shared reader
-behind per-platform acquisition backends:
+Documents is Kotlin Multiplatform, so the inspector targets every Documents platform through one
+shared reader behind per-target acquisition backends:
 
 - **Android** device / emulator — `adb exec-out run-as <pkg> …`
 - **iOS Simulator** — `xcrun simctl` (the simulator sandbox is a directory on the Mac)
