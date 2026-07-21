@@ -49,8 +49,10 @@ The plugin is not yet on the JetBrains Marketplace; install the built zip from d
 1. Run a **debuggable** (Android) or **development-signed** (iOS) build of your app on a device,
    emulator, or booted simulator.
 2. Open the **Documents Inspector** tool window and click **Connect**.
-3. Choose the platform (Android device / iOS simulator), pick the target, and enter the app's
-   application id (Android) or bundle id (iOS).
+3. Choose the platform (Android device / iOS simulator) and pick the target. The app id prompt is
+   **prefilled from the open project** — the Android application id of each app module, or the
+   bundle id from the Xcode project (falling back to the apps installed on the simulator). Confirm
+   it, pick another from the dropdown, or type any id to inspect an app whose sources are not open.
 4. Browse: pick a collection, then a document, and read its fields as JSON or plain text. Encrypted
    (`FieldDecorator`) fields show masked. **Refresh** reloads the last target.
 

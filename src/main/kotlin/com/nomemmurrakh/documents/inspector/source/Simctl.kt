@@ -25,6 +25,39 @@ internal interface Simctl {
     fun run(args: List<String>): SimctlResult
 }
 
+/**
+ * Converts NeXTSTEP plist text to JSON. `simctl listapps` emits plist regardless of the `-j` flag,
+ * so its output has to be converted before it can be parsed. Behind a seam so app-id discovery is
+ * testable without macOS.
+ */
+internal interface PlistToJson {
+
+    /** Converts [plist] to JSON, or returns null if conversion fails. */
+    fun convert(plist: String): String?
+}
+
+/** [PlistToJson] via `plutil`, reading the plist on stdin and writing JSON to stdout. */
+internal object ProcessPlutil : PlistToJson {
+
+    override fun convert(plist: String): String? = runCatching {
+        val process = ProcessBuilder("plutil", "-convert", "json", "-r", "-o", "-", "--", "-")
+            .redirectErrorStream(false)
+            .start()
+
+        val out = StringBuilder()
+        val reader = Thread { process.inputStream.bufferedReader().forEachLine { out.appendLine(it) } }
+        reader.start()
+        process.outputStream.bufferedWriter().use { it.write(plist) }
+
+        if (!process.waitFor(30, TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            return null
+        }
+        reader.join()
+        out.toString().takeIf { process.exitValue() == 0 && it.isNotBlank() }
+    }.getOrNull()
+}
+
 /** Runs `xcrun simctl` as a child process. */
 internal class ProcessSimctl(
     private val timeout: Long = 30,

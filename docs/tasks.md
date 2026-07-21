@@ -13,8 +13,14 @@ Legend: `[x]` done · `[~]` partially done · `[ ]` not started.
 ## Current state (0.1.0 — feature-complete)
 
 Phases 0–4 are done. The plugin has been **verified live on Android (real device) and the iOS
-simulator** against the Documents sample app (`com.nomemmurrakh.documents.sample`). 76 tests pass;
+simulator** against the Documents sample app (`com.nomemmurrakh.documents.sample`);
 `buildPlugin` produces `documents-inspector-0.1.0.zip`; `verifyPlugin` → Compatible.
+
+**Phase 5 (post-0.1.0) — done and verified live.** The Connect prompt is prefilled from the open
+project and stays editable. See [ADR-0008](adr/0008-prefill-app-id-from-the-ide.md). **94 tests
+pass** (76 + 18 new). Live iOS testing surfaced one ordering bug — with no `.xcodeproj` in the open
+project the list fell back to simulator apps alone and preselected an unrelated app that sorted
+first; fixed in T5.6 by ranking apps that already hold a Documents store ahead of those that do not.
 
 **What remains (all optional / deferred):**
 - **T2.5** — `IosDeviceSource` (physical iOS via `xcrun devicectl`).
@@ -135,9 +141,105 @@ See [ADR-0007](adr/0007-device-source-per-platform.md). Each backend must pull *
 
 ---
 
+## Phase 5 — Prefill the app id in the Connect prompt
+
+The Connect flow asks for the application id / bundle identifier with a bare input dialog seeded only
+by the previous target, so the first connect of a session always starts empty. The IDE usually knows
+the answer already. Detect it and prefill, while keeping the prompt editable so another app can still
+be inspected. See [ADR-0008](adr/0008-prefill-app-id-from-the-ide.md) for the decision and the
+alternatives rejected.
+
+**Verified during planning** (against Android Studio `AI-251.25410.109.2511.13752376`, and by running
+the CLIs live) — these are confirmed present, not assumed:
+
+| Need | API / mechanism |
+| --- | --- |
+| Android app id | `ProjectSystemUtil.getModuleSystem(module).applicationIdProvider.packageName` (`plugins/android/lib/android.jar`) — resolves the **installed** id, honouring `applicationIdSuffix`; throws `ApkProvisionException` when unsynced |
+| Android fallback | `AndroidModuleSystem.packageName` (does not throw) |
+| Enumerate modules | `ProjectFacetManager.getInstance(project).getFacets(AndroidFacet.ID)` (`lib/app.jar`) |
+| App vs library | `AndroidFacetConfiguration.isAppProject()` (`android-common.jar`) |
+| Editable dropdown | `Messages.showEditableChooseDialog(message, title, icon, values, initial, validator)` |
+| iOS bundle id | `PRODUCT_BUNDLE_IDENTIFIER` is a plain literal in `*.xcodeproj/project.pbxproj`. `Info.plist` holds only `$(PRODUCT_BUNDLE_IDENTIFIER)`, so **pbxproj is the source** |
+| iOS fallback | `xcrun simctl listapps <udid>`, filtered to `ApplicationType = User` (live run: 21 apps → 2 real user apps) |
+
+Two `simctl listapps` gotchas found live, both of which the implementation must handle:
+
+1. Output is **NeXTSTEP plist, not JSON** — `-j` is accepted but ignored. Pipe through
+   `plutil -convert json -r -o - -- -` to get JSON the existing `kotlinx-serialization-json` parses.
+2. It **exits 0 even on failure** (verified against a shut-down sim: printed `code=405 … Shutdown`,
+   returned 0). The `Simctl` seam keys off `exitCode`, so this path must not trust it — unparseable
+   stdout means "no candidates".
+
+- [x] **T5.1** `AppIdCandidates` — pure, IDE-free parsers, unit-testable with no device or IDE:
+      `parsePbxprojBundleIds` (regex `PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?([\w.\-]+)"?\s*;`, dropping
+      values containing `$(` and `*.tests`/`*.UITests` targets, distinct, order-preserving),
+      `parseListappsJson` (keep `ApplicationType == "User"`, read `CFBundleIdentifier`,
+      `emptyList()` on any parse failure), and `merge` (distinct, order-preserving).
+- [x] **T5.2** `IosSimulators.listApps` — add alongside `listBooted`/`appContainer`. Runs
+      `listapps <udid>`, converts via a `PlistToJson` seam (real impl shells out to `plutil`), then
+      delegates to `parseListappsJson`. **Ignores the exit code**; any failure returns `emptyList()`.
+- [x] **T5.3** `AppIdDetector` — the only class touching Android-plugin APIs, isolated so the rest
+      stays IDE-free. `androidCandidates(project)` filters `AndroidFacet`s by `isAppProject()` and
+      resolves each id, per-module `runCatching` so one unsynced module cannot kill the list;
+      `iosCandidates(project)` walks `project.basePath` for `*.xcodeproj/project.pbxproj` (bounded
+      depth, skipping `build/` and `.git/`) and parses each.
+- [x] **T5.4** Wire into `InspectorView`. `promptForApp` takes candidates and uses
+      `showEditableChooseDialog` when any exist, falling back to today's `showInputDialog` when none
+      do. Preselection: `lastTarget?.appLabel` (an explicit earlier choice wins) → else the first
+      candidate. Call sites are the Android and iOS prompts in `connectAndroid` / `connectIosSimulator`.
+      **Threading:** the pbxproj walk and `simctl` call must not run on the EDT — compute candidates
+      in the background and show the dialog via `invokeLater`, mirroring the existing `render()`
+      pattern; the facet reads need a read action.
+- [x] **T5.5** Tests — `AppIdCandidatesTest`: pbxproj literal extraction (fixture from the real
+      sample), `$(…)` variables skipped, test targets skipped, duplicates collapsed; `listapps` JSON
+      → only `User` ids (fixture captured live); malformed input → `emptyList()`. The existing 76
+      tests must still pass.
+- [x] **T5.6** Rank simulator candidates by whether the app's sandbox already holds a Documents
+      store (`Documents/mmkv/`), so the prompt does not preselect an unrelated installed app that
+      merely sorts first. Found in live testing: with no `.xcodeproj` in the open project the iOS
+      list fell back to simulator apps alone and preselected `com.nexcore.bigbros` over the sample.
+      The container path already comes back in the `listapps` output, so this adds no `simctl` calls;
+      it reuses the `CollectionFiles` seam and so stays testable. Ranking only — every user app is
+      still offered. 4 tests.
+
+**Live verification:** Android — `runIde`, open the `documents` repo, Connect → Android → device;
+the prompt should prefill `com.nomemmurrakh.documents.sample`, list app modules only, and still
+accept a typed id. iOS — boot the iPhone 17 Pro sim, Connect → iOS simulator; prefill comes from the
+pbxproj. Fallback — open a project with no `.xcodeproj` and confirm the sim's `User` apps are
+offered. Degradation — open a non-Android, non-iOS project and confirm a plain empty box with no error.
+
+---
+
 ## Known environment issue
 
-The inspector's own `./gradlew test` can be blocked by flaky DNS to `data.services.jetbrains.com`
-(the IntelliJ platform resolver at `build.gradle.kts` `androidStudio(...)`) — network, not code. The
-reader sources + tests were also verified compiling in a standalone JVM Gradle project without the
-IntelliJ dependency. Re-run in-module when DNS is stable.
+Gradle can fail to resolve the IntelliJ platform (`build.gradle.kts` `androidStudio(...)`) with
+`Couldn't resolve Android Studio download URL for version: '2025.1.1.14'` — network, not code.
+
+**Diagnosed 2026-07-21.** The real cause is a **JVM-only DNS failure** on `teamcity.jetbrains.com`
+(where `jb.gg/android-studio-releases-list.xml` redirects). The distinguishing symptom: `nslookup`
+and `dig` resolve the host fine, but `InetAddress.getByName` throws `UnknownHostException` for that
+host *and only that host* — `data.services.jetbrains.com`, `download.jetbrains.com`, and
+`google.com` all resolve from the same JVM. That points at a stale negative entry in macOS
+`mDNSResponder`, not at connectivity or an unpublished version (`2025.1.1.14` is still listed).
+
+Fix: `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder` (needs a password), then retry.
+
+**Workaround that does not need the network:** `--offline` uses the already-unpacked platform in
+`~/.gradle/caches`, and is enough for `compileKotlin` and `test`:
+
+```bash
+./gradlew test --offline --no-configuration-cache
+```
+
+Only `buildPlugin`, `runIde`, and `verifyPlugin` genuinely need the resolver, so live checks have to
+wait for DNS. To confirm the JVM-vs-shell split before blaming code, save this as `R.java` and run
+`java R.java` — if `nslookup` succeeds while this prints FAIL, it is the resolver cache:
+
+```java
+public class R {
+    public static void main(String[] a) throws Exception {
+        try { System.out.println("OK " + java.net.InetAddress.getByName("teamcity.jetbrains.com")); }
+        catch (Exception e) { System.out.println("FAIL " + e); }
+    }
+}
+```

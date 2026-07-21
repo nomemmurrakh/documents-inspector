@@ -65,8 +65,8 @@ internal class IosSimulatorSource(
         }
     }
 
-    private companion object {
+    internal companion object {
         const val MMKV_SUBPATH = "Documents/mmkv"
-        const val CRC_SUFFIX = ".crc"
+        private const val CRC_SUFFIX = ".crc"
     }
 }

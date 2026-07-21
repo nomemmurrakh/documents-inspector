@@ -12,9 +12,11 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.nomemmurrakh.documents.inspector.AppIdDetector
 import com.nomemmurrakh.documents.inspector.InspectorController
 import com.nomemmurrakh.documents.inspector.LoadResult
 import com.nomemmurrakh.documents.inspector.source.AdbDevices
+import com.nomemmurrakh.documents.inspector.source.AppIdCandidates
 import com.nomemmurrakh.documents.inspector.source.DeviceSource
 import com.nomemmurrakh.documents.inspector.source.DeviceSourceException
 import com.nomemmurrakh.documents.inspector.source.IosSimulator
@@ -27,9 +29,13 @@ import javax.swing.JPanel
 
 /**
  * The tool-window shell: the [InspectorPanel] tree plus a toolbar whose Connect / Refresh action
- * drives the acquisition flow — choose a device, enter the app package, pull + decode off the EDT,
+ * drives the acquisition flow — choose a device, confirm the app id, pull + decode off the EDT,
  * then render the result (or a failure message). The last target is remembered so Refresh re-runs
  * without re-prompting.
+ *
+ * The app-id prompt is prefilled from the open project via [AppIdDetector] and stays editable, so
+ * an app whose sources are not open can still be inspected. See
+ * `docs/adr/0008-prefill-app-id-from-the-ide.md`.
  */
 internal class InspectorView(private val project: Project) {
 
@@ -106,12 +112,17 @@ internal class InspectorView(private val project: Project) {
             return
         }
         chooseFrom(devices, "Select Device", { it.displayName }) { device ->
-            val pkg = promptForApp("Application id of the debuggable app to inspect:") ?: return@chooseFrom
-            loadInBackground(
-                Target(pkg, device.displayName) {
-                    InspectorController.androidSource(ProcessAdb(), pkg, device.serial)
-                },
-            )
+            withCandidates({ AppIdDetector.androidCandidates(project) }) { candidates ->
+                val pkg = promptForApp(
+                    "Application id of the debuggable app to inspect:",
+                    candidates,
+                ) ?: return@withCandidates
+                loadInBackground(
+                    Target(pkg, device.displayName) {
+                        InspectorController.androidSource(ProcessAdb(), pkg, device.serial)
+                    },
+                )
+            }
         }
     }
 
@@ -127,18 +138,58 @@ internal class InspectorView(private val project: Project) {
             return
         }
         chooseFrom(simulators, "Select Simulator", { it.displayName }) { sim ->
-            val bundleId = promptForApp("Bundle identifier of the app to inspect:") ?: return@chooseFrom
-            loadInBackground(
-                Target(bundleId, sim.displayName) {
-                    InspectorController.iosSimulatorSource(ProcessSimctl(), sim.udid, bundleId)
-                },
-            )
+            val detect = {
+                AppIdCandidates.merge(
+                    AppIdDetector.iosCandidates(project),
+                    IosSimulators.listApps(ProcessSimctl(), sim.udid),
+                )
+            }
+            withCandidates(detect) { candidates ->
+                val bundleId = promptForApp(
+                    "Bundle identifier of the app to inspect:",
+                    candidates,
+                ) ?: return@withCandidates
+                loadInBackground(
+                    Target(bundleId, sim.displayName) {
+                        InspectorController.iosSimulatorSource(ProcessSimctl(), sim.udid, bundleId)
+                    },
+                )
+            }
         }
     }
 
-    private fun promptForApp(prompt: String): String? =
-        Messages.showInputDialog(project, prompt, "Documents Inspector", null, lastTarget?.appLabel, null)?.trim()
-            ?.takeIf { it.isNotEmpty() }
+    private fun withCandidates(detect: () -> List<String>, onReady: (List<String>) -> Unit) {
+        ProgressManager.getInstance().run(
+            object : Task.Backgroundable(project, "Detecting app ids", false) {
+                private var candidates: List<String> = emptyList()
+
+                override fun run(indicator: ProgressIndicator) {
+                    candidates = runCatching(detect).getOrDefault(emptyList())
+                }
+
+                override fun onFinished() {
+                    ApplicationManager.getApplication().invokeLater { onReady(candidates) }
+                }
+            },
+        )
+    }
+
+    private fun promptForApp(prompt: String, candidates: List<String>): String? {
+        val entered = if (candidates.isEmpty()) {
+            Messages.showInputDialog(project, prompt, DIALOG_TITLE, null, lastTarget?.appLabel, null)
+        } else {
+            val offered = AppIdCandidates.merge(listOfNotNull(lastTarget?.appLabel), candidates)
+            Messages.showEditableChooseDialog(
+                prompt,
+                DIALOG_TITLE,
+                null,
+                offered.toTypedArray(),
+                offered.first(),
+                null,
+            )
+        }
+        return entered?.trim()?.takeIf { it.isNotEmpty() }
+    }
 
     private fun choosePlatform(onChosen: (Platform) -> Unit) =
         chooseFrom(Platform.entries.toList(), "Select Platform", { it.label }, onChosen)
@@ -192,5 +243,9 @@ internal class InspectorView(private val project: Project) {
     private fun statusText(): String {
         val target = lastTarget ?: return " "
         return "${target.appLabel}  •  ${target.deviceName}"
+    }
+
+    private companion object {
+        const val DIALOG_TITLE = "Documents Inspector"
     }
 }

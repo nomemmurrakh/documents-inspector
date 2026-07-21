@@ -53,6 +53,38 @@ internal object IosSimulators {
     }
 
     /**
+     * Lists the bundle identifiers of **user-installed** apps on booted simulator [udid], for
+     * prefilling the Connect prompt. See `docs/adr/0008-prefill-app-id-from-the-ide.md`.
+     *
+     * Apps that already hold a Documents store are returned **first**, so the prompt preselects a
+     * plausible target rather than whichever bundle id happens to sort first. Without this, an
+     * unrelated app installed on the simulator can win the preselection purely by name.
+     *
+     * Two quirks of `simctl listapps` are handled here. It emits NeXTSTEP plist even when asked for
+     * JSON, so the output is converted with [plist] first. And it **exits 0 even on failure** (for
+     * example against a shut-down simulator), so the exit code is deliberately ignored — output that
+     * does not parse simply yields no candidates. This is best-effort discovery: it never throws.
+     */
+    fun listApps(
+        simctl: Simctl,
+        udid: String,
+        plist: PlistToJson = ProcessPlutil,
+        files: CollectionFiles = LocalFiles,
+    ): List<String> =
+        runCatching {
+            val result = simctl.run(listOf("listapps", udid))
+            val converted = plist.convert(result.stdout) ?: return emptyList()
+            val apps = AppIdCandidates.parseListappsEntries(converted)
+            val (withStore, rest) = apps.partition { hasDocumentsStore(it, files) }
+            (withStore + rest).map { it.bundleId }
+        }.getOrDefault(emptyList())
+
+    private fun hasDocumentsStore(app: InstalledApp, files: CollectionFiles): Boolean {
+        val container = app.containerPath ?: return false
+        return files.listNames("$container/${IosSimulatorSource.MMKV_SUBPATH}").isNotEmpty()
+    }
+
+    /**
      * Resolves the data container path of [bundleId] on simulator [udid]
      * (`get_app_container <udid> <bundleId> data`). Throws [DeviceSourceException] with a clear
      * message when the app is not installed or the simulator is unavailable.

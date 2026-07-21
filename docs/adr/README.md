@@ -12,3 +12,4 @@ with its status updated to point at the ADR that replaced it.
 | [0005](0005-body-size-from-crc.md) | The body size comes from the `.crc` metafile, not the int32 at offset 0 | Accepted | 2026-07-20 |
 | [0006](0006-mmkv-length-prefix-then-cbor.md) | Each stored value is MMKV-length-prefixed, then CBOR — strip the prefix before decoding | Accepted | 2026-07-20 |
 | [0007](0007-device-source-per-platform.md) | One `DeviceSource` interface per platform; the reader is shared | Accepted | 2026-07-20 |
+| [0008](0008-prefill-app-id-from-the-ide.md) | Prefill the app id from the IDE, but keep the prompt editable | Accepted | 2026-07-21 |

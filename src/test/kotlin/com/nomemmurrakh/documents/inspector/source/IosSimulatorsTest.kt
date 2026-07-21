@@ -105,4 +105,118 @@ class IosSimulatorsTest {
         )
         assertEquals(listOf("get_app_container", "the-udid", "com.example.app", "data"), seen)
     }
+
+    private fun plistToJson(converted: String?) = object : PlistToJson {
+        override fun convert(plist: String): String? = converted
+    }
+
+    private val userAppsJson = """
+        {
+          "com.apple.Bridge" : { "ApplicationType" : "System", "CFBundleIdentifier" : "com.apple.Bridge" },
+          "com.nomemmurrakh.documents.sample" : {
+            "ApplicationType" : "User",
+            "CFBundleIdentifier" : "com.nomemmurrakh.documents.sample"
+          }
+        }
+    """.trimIndent()
+
+    @Test
+    fun `listApps invokes listapps and returns user installed bundle ids`() {
+        var seen: List<String>? = null
+        val apps = IosSimulators.listApps(
+            simctl { args -> seen = args; SimctlResult(0, "(plist text)", "") },
+            "the-udid",
+            plistToJson(userAppsJson),
+        )
+        assertEquals(listOf("listapps", "the-udid"), seen)
+        assertEquals(listOf("com.nomemmurrakh.documents.sample"), apps)
+    }
+
+    @Test
+    fun `listApps yields no candidates when the plist cannot be converted`() {
+        val apps = IosSimulators.listApps(
+            simctl { SimctlResult(0, "(plist text)", "") },
+            "the-udid",
+            plistToJson(null),
+        )
+        assertTrue(apps.isEmpty())
+    }
+
+    @Test
+    fun `listApps yields no candidates when simctl reports an error while exiting zero`() {
+        val shutdownError = "An error was encountered processing the command " +
+            "(domain=com.apple.CoreSimulator.SimError, code=405):\nUnable to lookup in current state: Shutdown"
+        val apps = IosSimulators.listApps(
+            simctl { SimctlResult(0, shutdownError, "") },
+            "the-udid",
+            plistToJson(null),
+        )
+        assertTrue(apps.isEmpty())
+    }
+
+    private val twoUserAppsJson = """
+        {
+          "com.nexcore.bigbros" : {
+            "ApplicationType" : "User",
+            "CFBundleIdentifier" : "com.nexcore.bigbros",
+            "DataContainer" : "file:///sim/bigbros/"
+          },
+          "com.nomemmurrakh.documents.sample" : {
+            "ApplicationType" : "User",
+            "CFBundleIdentifier" : "com.nomemmurrakh.documents.sample",
+            "DataContainer" : "file:///sim/sample/"
+          }
+        }
+    """.trimIndent()
+
+    private fun filesWithStoreAt(vararg dirs: String) = object : CollectionFiles {
+        override fun listNames(dir: String): List<String> =
+            if (dirs.any { dir == "$it/Documents/mmkv" }) listOf("documents.default", "documents.default.crc")
+            else emptyList()
+
+        override fun read(dir: String, name: String) = ByteArray(0)
+    }
+
+    @Test
+    fun `listApps ranks apps holding a Documents store first`() {
+        val apps = IosSimulators.listApps(
+            simctl { SimctlResult(0, "(plist)", "") },
+            "the-udid",
+            plistToJson(twoUserAppsJson),
+            filesWithStoreAt("/sim/sample"),
+        )
+        assertEquals(listOf("com.nomemmurrakh.documents.sample", "com.nexcore.bigbros"), apps)
+    }
+
+    @Test
+    fun `listApps keeps listing order when no app has a store`() {
+        val apps = IosSimulators.listApps(
+            simctl { SimctlResult(0, "(plist)", "") },
+            "the-udid",
+            plistToJson(twoUserAppsJson),
+            filesWithStoreAt(),
+        )
+        assertEquals(listOf("com.nexcore.bigbros", "com.nomemmurrakh.documents.sample"), apps)
+    }
+
+    @Test
+    fun `installed app decodes its percent encoded file url container`() {
+        val app = InstalledApp("com.example.app", "file:///Users/x/My%20Sim/Data/")
+        assertEquals("/Users/x/My Sim/Data", app.containerPath)
+    }
+
+    @Test
+    fun `installed app tolerates a missing container`() {
+        assertEquals(null, InstalledApp("com.example.app", null).containerPath)
+    }
+
+    @Test
+    fun `listApps never throws when simctl itself fails`() {
+        val apps = IosSimulators.listApps(
+            simctl { throw DeviceSourceException("xcrun simctl timed out") },
+            "the-udid",
+            plistToJson(userAppsJson),
+        )
+        assertTrue(apps.isEmpty())
+    }
 }
